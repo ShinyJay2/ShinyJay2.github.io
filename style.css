@@ -1,6 +1,5 @@
 /* =============================================
    JAEHOON JANG — ACADEMIC PORTFOLIO
-   Inspired by karpathy.ai, jonbarron.info
    Clean, minimal, content-first.
    ============================================= */
 
@@ -97,19 +96,7 @@ section {
     height: 160px;
     border-radius: 12px;
     object-fit: cover;
-}
-.photo-placeholder {
-    width: 160px;
-    height: 160px;
-    border-radius: 12px;
-    background: #f0f0f0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Source Serif 4', Georgia, serif;
-    font-size: 2.4rem;
-    font-weight: 700;
-    color: #999;
+    object-position: center 20%;
 }
 .header-info {
     flex: 1;
@@ -129,7 +116,13 @@ section {
     font-size: 0.95rem;
     color: #444;
     line-height: 1.7;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
+}
+.bio-note {
+    font-size: 0.88rem;
+    color: #777;
+    font-style: italic;
+    margin-bottom: 10px;
 }
 .links {
     display: flex;
@@ -287,6 +280,55 @@ section {
     color: #888;
 }
 
+/* ---------- Experience ---------- */
+.exp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.exp-item {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+.exp-logo {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+}
+.exp-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.logo-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: #f0f0f0;
+    border: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #666;
+}
+.exp-info h3 {
+    font-size: 1rem;
+    margin-bottom: 0;
+}
+.exp-role {
+    font-size: 0.92rem;
+    color: #444;
+    margin-bottom: 0;
+}
+.exp-detail {
+    font-size: 0.82rem;
+    color: #888;
+    margin-bottom: 0;
+}
+
 /* ---------- Education ---------- */
 .edu-list {
     display: flex;
@@ -323,7 +365,40 @@ section {
     margin-bottom: 0;
 }
 
+/* ---------- Certifications ---------- */
+.cert-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.cert-item {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.cert-logo {
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+    color: #888;
+    font-size: 1.1rem;
+}
+.cert-info h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0;
+}
+.cert-detail {
+    font-size: 0.82rem;
+    color: #888;
+    margin-bottom: 0;
+}
+
 /* ---------- Projects ---------- */
+.section-note {
+    font-size: 0.85rem;
+    color: #999;
+    margin-bottom: 12px;
+}
 .project-list {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -352,6 +427,26 @@ section {
     font-size: 0.78rem;
     color: #999;
 }
+.project-lang {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.project-lang::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.project-lang.lang-python::before { background: #3572A5; }
+.project-lang.lang-jupyter::before { background: #DA5B0B; }
+.project-lang.lang-html::before { background: #e34c26; }
+.project-lang.lang-javascript::before { background: #f1e05a; }
+.project-lang.lang-default::before { background: #ccc; }
 
 /* ---------- Blog ---------- */
 .blog-posts {
@@ -370,7 +465,7 @@ section {
 .blog-date {
     font-size: 0.82rem;
     color: #999;
-    min-width: 72px;
+    min-width: 80px;
     flex-shrink: 0;
 }
 .blog-post a {
@@ -381,6 +476,13 @@ section {
 .more-link {
     margin-top: 12px;
     font-size: 0.9rem;
+}
+
+/* ---------- Loading ---------- */
+.loading-text {
+    font-size: 0.9rem;
+    color: #999;
+    font-style: italic;
 }
 
 /* ---------- Footer ---------- */
