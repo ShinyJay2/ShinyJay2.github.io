@@ -280,6 +280,8 @@ Although the observed transition was only C to D, earlier states also receive in
 
 Under the appropriate offline or fixed-weight conditions, the accumulated backward-view updates correspond to the forward-view lambda return. Conventional online TD(lambda), where values change during an episode, is not automatically identical to a frozen forward-view calculation. The essential intuition remains that traces distribute new information backward without explicitly recomputing every future return.
 
+<div class="explainer" data-explainer="rl-traces"></div>
+
 The next article moves from prediction to control, comparing the on-policy SARSA update with off-policy Q-learning.
 
 

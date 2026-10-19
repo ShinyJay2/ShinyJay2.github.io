@@ -185,6 +185,8 @@ The online parameters theta receive gradient updates. The target parameters rema
 
 For those C steps, changing theta does not immediately change the value function used to construct the target. This provides a more stable regression problem. Replay and the target network address different issues: replay changes the training samples, while the target network stabilizes their targets.
 
+<div class="explainer" data-explainer="rl-dqn"></div>
+
 ## DQN pseudocode
 
 The two mechanisms fit into the following algorithm. States may include a preprocessing function or a stack of observations, as in Atari implementations.

@@ -202,6 +202,8 @@ Q_{k+1}(s,a)=R(s,a)+\gamma\sum_{s'}P(s'\mid s,a)\max_{a'}Q_k(s',a'),
 \pi^*(s)\in\operatorname*{arg\,max}_aQ^*(s,a).
 ```
 
+<div class="explainer" data-explainer="rl-dp"></div>
+
 ## From full backups to sampled backups
 
 Dynamic programming uses **full-width backups**: for the state being updated, it calculates an expectation across all possible successor states. In the grid example, full sweeps also update every nonterminal state. These are two separate choices: the width of a backup and the schedule of state updates.

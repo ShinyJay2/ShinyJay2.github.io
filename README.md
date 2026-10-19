@@ -42,7 +42,7 @@ Alternatively, the contents of `dist/` are a complete static website suitable fo
 - Conflicting master’s degree dates are omitted pending confirmation.
 - The Qwen LoRA experiment retains its original publication date of March 5, 2026, verified against Tistory post 75. Twelve other selected Tistory articles are included in English with their original publication dates: RL parts 1–8, DeepSeek-R1, Unsupervised Learning, SimCLR, and MoCo. Deterministic vs Stochastic Policy and the ECCV 2016 jigsaw article are excluded. Preserve original publication dates when migrating existing posts.
 - No invented publication, study post, benchmark, or credential has been added.
-- The personal `conversation-to-blog` Codex skill is installed separately from this public repository. It requires interactive visualizations that explain difficult or confusing concepts while preserving the conversation content.
+- The [conversation-to-blog skill](skills/conversation-to-blog/README.md) is open source under an MIT license scoped to its directory. It requires interactive visualizations that explain difficult or confusing concepts while preserving the conversation content.
 
 The original root `index.html`, `style.css`, `script.js`, and `images/` are retained in the working checkout for comparison. The new build uses `scripts/build.mjs`, `assets/`, and `posts/`; deploy only `dist/`.
 
@@ -68,3 +68,5 @@ The L1/EMA article preserves the full English answer from the requested JEPA con
 Use `\(...\)` for inline KaTeX. Visual placeholders use `<div class="explainer" data-explainer="NAME"></div>` with `l1`, `ema`, `latent`, `projection`, `circle`, or `frequency`. The self-contained SVG illustrations use local JavaScript and require no plotting service. Their numeric functions live in `assets/explainer-math.js`. Sample plots use fixed seeds for reproducibility; they are illustrations, not experimental results. The full article remains readable without JavaScript.
 
 The blog index groups each series at its most recent publication date and orders its chapters by `part`. RSS remains chronological. RL articles include previous/next chapter links and a complete contents list.
+
+All eight RL articles also include interactive explanations of their difficult steps. `assets/rl-explainers.js` renders the controls and SVG diagrams; `assets/rl-math.js` keeps the numerical calculations separate. Existing article content is retained in full.

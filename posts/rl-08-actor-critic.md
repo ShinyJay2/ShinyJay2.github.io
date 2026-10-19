@@ -247,6 +247,8 @@ For an episode, the sum ends at termination. Lambda zero gives the one-step TD e
 
 This recovers the same conceptual progression as the value-learning chapter: one-step TD, multi-step targets, then a weighted mixture of horizons. The quantity being estimated here is the advantage used by the actor.
 
+<div class="explainer" data-explainer="rl-gae"></div>
+
 ## Toward distributed training
 
 Actor-critic methods maintain an evaluator and a policy that are updated together. The policy-gradient derivation made these sampled MC and TD signals usable for optimizing the actor.

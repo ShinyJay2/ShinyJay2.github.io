@@ -206,6 +206,8 @@ Contraction also controls the distance between successive iterates:
 
 Each successive change becomes smaller. The methods that use these backups include value iteration and policy iteration with a known model, and sampled Q-learning updates when a model is unavailable.
 
+<div class="explainer" data-explainer="rl-bellman"></div>
+
 The following comparison previews how the maximum enters different algorithms:
 
 | Method | Model required? | Where the maximum appears | Interpretation |

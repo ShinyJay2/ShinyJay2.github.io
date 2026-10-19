@@ -1,0 +1,4 @@
+interface:
+  display_name: "Conversation to Blog"
+  short_description: "Preserve conversation explanations in blog posts"
+  default_prompt: "Use $conversation-to-blog to turn the selected Codex conversation into an English post for my blog, preserving its explanations and adding useful visualizations."

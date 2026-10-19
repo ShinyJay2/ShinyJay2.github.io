@@ -226,6 +226,8 @@ In practice, the true Q is unknown. Sampled returns provide one estimate:
 
 The sequence of transformations has converted an expectation over all possible outcomes into a quantity that can be estimated from finite experience.
 
+<div class="explainer" data-explainer="rl-gradient"></div>
+
 ## REINFORCE
 
 REINFORCE uses the Monte Carlo return Gₜ in place of the unknown Q-value. It collects a complete episode, calculates returns, and performs a policy update:

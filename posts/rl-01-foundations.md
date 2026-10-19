@@ -170,6 +170,8 @@ This is a relative measure. It removes the state's baseline value and leaves the
 
 Advantage becomes important again in policy gradients. Subtracting a suitable state-dependent baseline centers the update signal and can reduce its variance. It is similar in spirit to centering data, although it is not automatically a normalization by scale.
 
+<div class="explainer" data-explainer="rl-value"></div>
+
 ## Optimal values and policies
 
 The objective requires a definition of “optimal.” For value functions, it means the largest value achievable across policies:

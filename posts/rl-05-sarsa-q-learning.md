@@ -101,6 +101,8 @@ This does not mean that Q-learning ignores the action actually taken at the curr
 
 The behavior policy can remain epsilon-greedy in both methods. SARSA's target includes that exploratory behavior; Q-learning's target follows a greedy policy even when the behavior does not.
 
+<div class="explainer" data-explainer="rl-control"></div>
+
 At a terminal state, both targets reduce to the received reward because no future action value remains. The next article replaces Q-learning's table with a neural function approximator.
 
 

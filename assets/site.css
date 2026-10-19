@@ -72,6 +72,9 @@ html[data-theme=dark] .explainer{--viz-secondary:#73c6c1}
 .viz-legend{display:flex;flex-wrap:wrap;gap:9px 22px;margin:16px 0;font-size:12px}.viz-legend span{display:flex;align-items:center;gap:8px}
 .viz-legend i{display:inline-block;width:20px;height:3px;background:var(--muted)}.viz-legend .primary{background:var(--accent)}.viz-legend .secondary{background:var(--viz-secondary)}.viz-legend .reference{background:var(--text)}.viz-legend .contour{background:none;border-top:1px dashed var(--muted)}
 .viz-result{border-top:1px solid var(--line);padding-top:18px;font-size:13px;font-variant-numeric:tabular-nums;min-height:70px}
+.article .viz-table{font-size:12px;line-height:1.5;margin:20px 0}.viz-table th,.viz-table td{font-variant-numeric:tabular-nums}
+.rl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;max-width:450px;margin:28px auto}
+.rl-cell{padding:14px 5px;text-align:center;border:1px solid var(--line);border-radius:4px;background:var(--bg)}.rl-cell small{display:block;color:var(--muted);font-size:12px}.rl-cell strong{display:block;margin-top:6px;font-size:18px;font-weight:500}.rl-cell.selected{border:2px solid var(--accent)}.rl-cell.terminal{background:var(--line)}
 @media(max-width:600px){.explainer{padding:18px 14px}.viz-controls{grid-template-columns:1fr}.article .viz-heading h3{font-size:22px}}
 @media(max-width:600px){.portrait{width:165px;margin-left:24px}}
 @media(max-width:400px){.portrait{width:140px;margin-left:18px}}
