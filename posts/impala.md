@@ -1,16 +1,30 @@
 ---
-title: "Reinforcement Learning 10: IMPALA and V-trace"
+title: "IMPALA and V-trace"
 date: "2026-10-20"
 category: "Reinforcement Learning"
 description: "Why policy lag needs correction, how V-trace works backward, and why its two clipping weights have different jobs."
 draft: false
-series: "Reinforcement Learning"
-part: 10
 ---
 
-[A3C](/blog/rl-09-a3c/) workers both interact with environments and compute gradients. IMPALA separates these jobs. Actors produce trajectories; a learner consumes those trajectories and updates the network. Actors periodically obtain newer parameters from the learner.
+[A3C](/blog/a3c/) workers both interact with environments and compute gradients. IMPALA separates these jobs. Actors produce trajectories; a learner consumes those trajectories and updates the network. Actors periodically obtain newer parameters from the learner.
 
 This separation creates **policy lag**. By the time a trajectory reaches the learner, the policy that produced it may already be outdated. V-trace is the return estimator used to account for that mismatch.
+
+## Actor–learner architecture
+
+The left panel below shows actors feeding a single learner. The arrows distinguish experience flowing toward the learner from parameters flowing back to the actors. The right panel distributes learning across synchronous learners; it is not a diagram of A3C workers independently applying asynchronous gradients.
+
+<figure class="paper-figure"><a href="/assets/papers/impala-figure-1.png"><img src="/assets/papers/impala-figure-1.png" alt="Original IMPALA Figure 1: actors exchange observations and parameters with a single learner or multiple synchronous learners." loading="lazy"></a><figcaption>Figure 1 from Espeholt et al., <a href="https://arxiv.org/pdf/1802.01561v3#page=2">IMPALA</a>, p. 2. Original actor–learner architecture. Open the figure for full resolution.</figcaption></figure>
+
+The timeline makes the scheduling difference visible. In the two batched A2C examples, synchronization creates waiting periods. IMPALA separates actor progress from the learner's forward and backward passes. These panels compare batched A2C with IMPALA, not A3C with IMPALA.
+
+<figure class="paper-figure"><a href="/assets/papers/impala-figure-2.png"><img src="/assets/papers/impala-figure-2.png" alt="Original IMPALA Figure 2 comparing step-synchronized A2C, trajectory-synchronized A2C, and decoupled IMPALA timelines." loading="lazy"></a><figcaption>Figure 2 from Espeholt et al., <a href="https://arxiv.org/pdf/1802.01561v3#page=2">IMPALA</a>, p. 2. Environment steps and neural-network computation under different schedules. Open the figure for full resolution.</figcaption></figure>
+
+## Network architecture in the experiments
+
+The distributed architecture determines where work happens. The network architecture determines how observations become policy and value predictions. Figure 3 shows the paper's small convolutional model and larger residual model. Both combine visual features with other inputs and use an LSTM before policy and value outputs. These are the experimental networks, rather than a required definition of the V-trace algorithm.
+
+<figure class="paper-figure"><a href="/assets/papers/impala-figure-3.png"><img src="/assets/papers/impala-figure-3.png" alt="Original IMPALA Figure 3 showing small convolutional and large residual networks with recurrent policy and value outputs." loading="lazy"></a><figcaption>Figure 3 from Espeholt et al., <a href="https://arxiv.org/pdf/1802.01561v3#page=5">IMPALA</a>, p. 5. Small and large model architectures. Open the figure for full resolution.</figcaption></figure>
 
 ## Two policies for one recorded action
 
@@ -184,7 +198,7 @@ The behavior probability must be the probability at collection time. Replacing i
 
 V-trace makes policy lag manageable; it does not make unlimited lag harmless. Queue length, actor refresh frequency, and learner throughput still affect how different the two policies become.
 
-The next chapter, [PPO](/blog/rl-11-ppo/), also uses a probability ratio. Its main purpose is different: controlling the incentive to change a policy while repeatedly optimizing a freshly collected batch.
+The [PPO](/blog/ppo/), also uses a probability ratio. Its main purpose is different: controlling the incentive to change a policy while repeatedly optimizing a freshly collected batch.
 
 ## Reference
 

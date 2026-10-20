@@ -41,7 +41,7 @@ Alternatively, the contents of `dist/` are a complete static website suitable fo
 - Biography, employment, education, award, and publication derive from the existing site.
 - Conflicting master’s degree dates are omitted pending confirmation.
 - The Qwen LoRA experiment retains its original publication date of March 5, 2026, verified against Tistory post 75. Twelve other selected Tistory articles are included in English with their original publication dates: RL parts 1–8, DeepSeek-R1, Unsupervised Learning, SimCLR, and MoCo. Deterministic vs Stochastic Policy and the ECCV 2016 jigsaw article are excluded. Preserve original publication dates when migrating existing posts.
-- A3C, IMPALA, and PPO are newly written explanatory chapters dated October 20, 2026, with primary-paper references and worked examples. They are not migrated Tistory content. No experimental results or credentials are invented.
+- A3C, IMPALA, and PPO are standalone explanatory articles dated October 20, 2026, with primary-paper references and worked examples. They are not migrated Tistory content. No experimental results or credentials are invented.
 - The [conversation-to-blog skill](skills/conversation-to-blog/README.md) is open source under an MIT license scoped to its directory. It requires interactive visualizations that explain difficult or confusing concepts while preserving the conversation content.
 
 The original root `index.html`, `style.css`, `script.js`, and `images/` are retained in the working checkout for comparison. The new build uses `scripts/build.mjs`, `assets/`, and `posts/`; deploy only `dist/`.
@@ -69,4 +69,6 @@ Use `\(...\)` for inline KaTeX. Visual placeholders use `<div class="explainer" 
 
 The blog index groups each series at its most recent publication date and lists chapters newest first, using descending `part` for same-day chapters. RSS remains chronological with the same tie-break. RL articles include previous/next chapter links and a complete contents list.
 
-All eleven RL articles also include interactive explanations of their difficult steps. `assets/rl-explainers.js` renders the controls and SVG diagrams; `assets/rl-math.js` keeps the numerical calculations separate. Existing article content is retained in full.
+The eight RL series articles and three standalone method articles also include interactive explanations of their difficult steps. `assets/rl-explainers.js` renders the controls and SVG diagrams; `assets/rl-math.js` keeps the numerical calculations separate. Existing article content is retained in full.
+
+A3C, IMPALA, and PPO belong to the Reinforcement Learning category but are not numbered series entries. Their former numbered URLs redirect to `/blog/a3c/`, `/blog/impala/`, and `/blog/ppo/`. Original paper figures and algorithms are reproduced with linked attribution in their captions; these third-party assets are not covered by the skill license.

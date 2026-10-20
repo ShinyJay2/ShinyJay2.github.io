@@ -1,11 +1,9 @@
 ---
-title: "Reinforcement Learning 9: A3C and Asynchronous Learning"
+title: "A3C and Asynchronous Learning"
 date: "2026-10-20"
 category: "Reinforcement Learning"
 description: "Local workers, n-step returns, and why an asynchronous actor-critic update can be stale."
 draft: false
-series: "Reinforcement Learning"
-part: 9
 ---
 
 [Actor-critic methods](/blog/rl-08-actor-critic/) combine a policy that chooses actions with a value function that evaluates their consequences. A3C keeps that basic relationship and changes how experience and gradients are produced: several workers interact with their own environments and update shared parameters asynchronously.
@@ -26,6 +24,12 @@ Suppose three workers explore three copies of the same task. Their observations 
 A worker copies the shared weights, collects a short sequence, computes gradients locally, and applies those gradients to the shared weights. It then copies the updated shared weights and repeats. It does not wait for every other worker to finish the same stage.
 
 Different trajectories help reduce the correlation that would arise from training only on consecutive observations from one environment. The original A3C design uses this parallel experience without DQN's replay buffer. This does not make individual trajectories independent or remove every source of instability.
+
+## The original worker procedure
+
+The paper describes the shared and local parameter arrangement through Algorithm S3 rather than an architecture diagram. The primed parameters belong to a worker; the unprimed parameters are shared. Read the synchronization step near the top and the asynchronous update near the bottom together: local computation sits between those two exchanges.
+
+<figure class="paper-figure"><a href="/assets/papers/a3c-algorithm-s3.png"><img src="/assets/papers/a3c-algorithm-s3.png" alt="Original A3C Algorithm S3 showing shared parameters, thread-local copies, rollout collection, backward return computation, and asynchronous updates." loading="lazy"></a><figcaption>Algorithm S3 from Mnih et al., <a href="https://arxiv.org/pdf/1602.01783v2#page=14">Asynchronous Methods for Deep Reinforcement Learning</a>, supplementary material, p. 14. Reproduced from the original PDF. Open the figure for full resolution.</figcaption></figure>
 
 ## Turning a short rollout into a return
 
@@ -137,7 +141,7 @@ A synchronous alternative waits for workers, combines their batches, and perform
 
 Asynchronous workers avoid a global wait at each update, but they also complicate reproducibility and can apply increasingly stale gradients. Adding more workers is therefore not automatically beneficial.
 
-There is another architectural choice: let actors generate experience while a separate learner computes all gradients. That makes centralized accelerator training possible, but introduces a new mismatch between the policy that generated the data and the policy being trained. [IMPALA](/blog/rl-10-impala/) addresses that problem with V-trace.
+There is another architectural choice: let actors generate experience while a separate learner computes all gradients. That makes centralized accelerator training possible, but introduces a new mismatch between the policy that generated the data and the policy being trained. [IMPALA](/blog/impala/) addresses that problem with V-trace.
 
 ## Reference
 

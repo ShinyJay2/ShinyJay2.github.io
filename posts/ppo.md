@@ -1,14 +1,12 @@
 ---
-title: "Reinforcement Learning 11: PPO and the Clipped Objective"
+title: "PPO and the Clipped Objective"
 date: "2026-10-20"
 category: "Reinforcement Learning"
 description: "Probability ratios, positive and negative advantages, and what PPO clipping actually limits."
 draft: false
-series: "Reinforcement Learning"
-part: 11
 ---
 
-A policy-gradient batch contains useful experience, but taking many optimization steps on it can change the policy far from the one that collected the data. PPO addresses this by modifying the objective used during repeated updates. This chapter focuses on **PPO-Clip**, the commonly used clipped-surrogate version.
+A policy-gradient batch contains useful experience, but taking many optimization steps on it can change the policy far from the one that collected the data. PPO addresses this by modifying the objective used during repeated updates. This article focuses on **PPO-Clip**, the commonly used clipped-surrogate version.
 
 The difficult part is not writing a clipping function. It is understanding why the objective takes a minimum, why the sign of the advantage changes the answer, and why clipping is not a hard limit on the new policy.
 
@@ -122,6 +120,10 @@ Below 0.8, reducing the probability further receives no additional benefit from 
 
 The minimum in the original equation has not become a maximum by mistake. Factoring a negative number outside a minimum reverses the ordering of the terms inside it.
 
+The original paper visualizes the two signs directly. The red point marks the initial ratio of 1; the horizontal segment marks the side where this sample stops receiving additional improvement credit.
+
+<figure class="paper-figure"><a href="/assets/papers/ppo-figure-1.png"><img src="/assets/papers/ppo-figure-1.png" alt="Original PPO Figure 1 showing the clipped objective for positive and negative advantages." loading="lazy"></a><figcaption>Figure 1 from Schulman et al., <a href="https://arxiv.org/pdf/1707.06347v2#page=3">Proximal Policy Optimization Algorithms</a>, p. 3. Original clipped-objective plots. Open the figure for full resolution.</figcaption></figure>
+
 <div class="explainer" data-explainer="rl-ppo"></div>
 
 ## A plateau in the loss is not a wall around the policy
@@ -176,6 +178,10 @@ The minus sign converts the maximized policy objective into a minimized loss. Th
 
 ## Reusing a batch without moving its reference point
 
+The PPO paper does not provide a network architecture diagram. Its actor-critic training arrangement is summarized in Algorithm 1: multiple actors collect trajectories, then optimization reuses the combined batch. The policy snapshot is refreshed after that optimization stage.
+
+<figure class="paper-figure"><a href="/assets/papers/ppo-algorithm-1.png"><img src="/assets/papers/ppo-algorithm-1.png" alt="Original PPO Algorithm 1: parallel actors collect trajectories, advantages are computed, and the surrogate is optimized over multiple epochs before refreshing the old policy." loading="lazy"></a><figcaption>Algorithm 1 from Schulman et al., <a href="https://arxiv.org/pdf/1707.06347v2#page=5">Proximal Policy Optimization Algorithms</a>, p. 5. Original actor-critic training procedure. Open the figure for full resolution.</figcaption></figure>
+
 ```algorithm
 {"title":"PPO-Clip with a fixed rollout reference","inputs":"Rollout size; optimization epochs K; minibatch size; clipping width ε","lines":[[0,"**Repeat** for each rollout batch:"],[1,"Collect fresh trajectories with the current policy; save action log probabilities and value estimates."],[1,"Compute bootstrapped returns and advantage estimates; detach them."],[1,"**For** epoch 1 through K:"],[2,"Shuffle the rollout into minibatches."],[2,"**For** each minibatch:"],[3,"Evaluate current log probabilities, values, and entropy."],[3,"Form ratios against the unchanged saved log probabilities."],[3,"Compute the clipped policy objective and value loss."],[3,"Take an optimizer step on the combined minimized loss."],[1,"Discard the batch and collect new experience using the updated policy."]]}
 ```
@@ -184,7 +190,7 @@ Reusing a fresh batch for several epochs differs from keeping a long-lived repla
 
 ## How the three methods fit together
 
-| Method | Main mechanism in this series | Where the mismatch appears |
+| Method | Main mechanism | Where the mismatch appears |
 | --- | --- | --- |
 | A3C | Workers collect rollouts and asynchronously apply local gradients | Other workers may update shared parameters before a local gradient arrives |
 | IMPALA | Actors send experience to a learner using V-trace corrections | The learner's policy differs from the behavior policy that generated a trajectory |
