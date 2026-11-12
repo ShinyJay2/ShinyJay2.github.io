@@ -20,7 +20,7 @@ function sumWidget(el){
   const {P}=product(r,false);
   q('.mx-row').innerHTML=mx(B,D,r,'var(--m-orange)','B',(a)=>a===i?'on':'dim')+'<span class="mx-op">\u00b7</span>'+mx(A,r,D,'var(--viz-secondary)','A',(a,c)=>c===j?'on':'dim')+'<span class="mx-op">=</span>'+mx(P,D,D,'var(--m-green)','BA',(a,c)=>a===i&&c===j?'out':'dim');
   const terms=[...Array(r)].map((_,k)=>`<span class="t"><span class="b">(${sg(B[i][k])})</span>(<span class="a">${sg(A[k][j])}</span>)</span>`).join(' + ');
-  q('.lora-terms').innerHTML=`<span class="s">(BA)<sub>${i+1}${j+1}</sub></span> = ${terms} = <span class="s">${sg(P[i][j]).replace(/(\.\d\d)$/,m=>m)}${''}</span> &nbsp;(${fmt(P[i][j],4)})<br><span style="color:#8d8d8d">${r} ${r===1?'term':'terms'}. The shape of BA stays ${D} \u00d7 ${D} for every r.</span>`;};
+  q('.lora-terms').innerHTML=`<span class="s">(BA)<sub>${i+1}${j+1}</sub></span> = ${terms} = <span class="s">${sg(P[i][j]).replace(/(\.\d\d)$/,m=>m)}${''}</span> &nbsp;(${fmt(P[i][j],4)})<br><span style="color:var(--muted)">${r} ${r===1?'term':'terms'}. The shape of BA stays ${D} \u00d7 ${D} for every r.</span>`;};
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
 function scaleWidget(el){
