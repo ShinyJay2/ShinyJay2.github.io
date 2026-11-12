@@ -157,7 +157,7 @@ The rank \(r\) is the number of these pairs: \(r\) keys and \(r\) values. A larg
 
 **Local** means the correction only matters near the keys. An input unrelated to what the adapter was trained on scores low against every key, so almost nothing is added and the layer behaves like the frozen base model.
 
-For example, if a general-purpose model is fine-tuned on medical literature, one key might come to respond to heart-related inputs while its value adds a cardiology-flavored correction, and a cooking question would trigger almost nothing.
+For example, if a general-purpose model is fine-tuned on medical literature, one key might come to respond to heart-related inputs while its value adds a cardiology-flavored correction, and a cooking-related user query would trigger almost nothing.
 
 <div class="explainer" data-explainer="lora-lookup"></div>
 
@@ -199,3 +199,7 @@ Because \(A\) and \(B\) play different roles, they need not share a learning rat
 ```
 
 The reason is a mismatch in scale. \(A\) maps a wide input down to a few dimensions, and \(B\) maps those few dimensions back up to the full output. With a single learning rate, \(B\) tends to be undertrained. Raising \(B\)'s learning rate keeps the two matrices learning at a matched pace, which speeds up fine-tuning and often improves the final result without adding any parameters.
+
+## Source
+
+These notes are based on [The Tiny Idea That Lets Anyone Fine-Tune AI](https://www.youtube.com/watch?v=U80tjcThl9Q) by Jia-Bin Huang.
