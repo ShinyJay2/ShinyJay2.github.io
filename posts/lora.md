@@ -131,26 +131,35 @@ Write the rows of \(A\) as \(a_1^\top, \dots, a_r^\top\) and the columns of \(B\
 
 <div class="explainer" data-explainer="lora-pairs"></div>
 
-Each index \(k\) is one pair:
+Each index \(k\) is one key-value pair:
 
-- **\(a_k\) is a key.** \(a_k^\top x\) is a similarity score: large when \(x\) points along \(a_k\), near zero when it is perpendicular, negative when it points the other way. A key "responds" to an input when this score is large. The score is computed in every forward pass, during training and after it, and needs no label or loss.
-- **\(b_k\) is a value.** In a key-value store, the key is what an input is compared against and the value is what comes back. Here \(b_k\) is what comes back: a vector with the size of the output that gets added to it. During training, \(b_k\) stores the correction learned from the training set; at use time, that correction is added with weight \(a_k^\top x\). The key decides *how much*, the value decides *what*. For example, if \(W_0 x = (1.0, 2.0, 0.5)\), \(b_1 = (0.3, -0.1, 0.2)\), and the score is \(0.9\), the output becomes \((1.0, 2.0, 0.5) + 0.9\,b_1 = (1.27, 1.91, 0.68)\). With a score of \(0\), it stays \((1.0, 2.0, 0.5)\).
+- **\(a_k\) is a key.** \(a_k^\top x\) is a similarity score: large when \(x\) points along \(a_k\), near zero when it is perpendicular, negative when it points the other way. A key "responds" to an input when this score is large. The score is computed in every forward pass and needs no label or loss.
+- **\(b_k\) is a value.** In a key-value store, the key is what an input is compared against and the value is what comes back. Here \(b_k\) is what comes back: a vector with the size of the output that gets added to it, with weight \(a_k^\top x\). The key decides *how much*, the value decides *what*. If \(W_0 x = (1.0, 2.0, 0.5)\), \(b_1 = (0.3, -0.1, 0.2)\), and the score is \(0.9\), the output becomes \((1.0, 2.0, 0.5) + 0.9\,b_1 = (1.27, 1.91, 0.68)\). With a score of \(0\), it stays \((1.0, 2.0, 0.5)\).
 
-This is not extra machinery; it is the same \(BAx\) read in two steps. The structure exists from the first step of training. What training adds is meaning. \(B\) starts at zero, so every value is zero, and the random rows of \(A\) detect nothing in particular. Gradient descent then moves each \(b_k\) toward the correction that lowers the loss on inputs where \(a_k\) scores high, and moves each \(a_k\) toward inputs where adding \(b_k\) helped. After training, a key scores high on the kinds of inputs whose outputs needed correcting, and its value is that correction. The rank \(r\) is the number of such pairs.
+### The structure is there from the start; training gives it meaning
+
+Nothing new was added to LoRA to get keys and values. They are the same \(BAx\), computed in two steps: first \(Ax\) scores the input against every key, then \(B\) adds every value in proportion to its score. So the key-value structure exists from the very first training step, not only after training.
+
+What the structure holds changes during training:
+
+1. **At the start, the values are empty.** \(B\) is initialized to zero, so every \(b_k\) is zero and nothing is added, whatever the scores are. The keys are the random rows of \(A\): they respond to inputs, but not to anything in particular.
+2. **Training writes the values.** On inputs where a key scores high, gradient descent moves its value \(b_k\) toward the correction that lowers the loss on the training set.
+3. **Training sharpens the keys.** Once \(b_k\) is useful, \(a_k\) moves toward the inputs on which adding \(b_k\) helped, so the key responds more strongly to them.
+4. **After training, the pairs mean something.** Each key responds to a kind of input whose output needed correcting, and its value holds that correction.
+
+The rank \(r\) is the number of these pairs: \(r\) keys and \(r\) values. A larger rank gives the adapter more slots, each able to hold a different correction for a different kind of input.
 
 ## Why this is called a local associative memory
 
-**Memory** because \(A\) and \(B\) behave like a store that is written once and read many times. Training *writes* pairs into it: each key \(a_k\) and its value \(b_k\) are stored in the weights and stay fixed afterward. Inference *reads* from it: every input \(x\) acts as a cue. The layer does not pick a key; it scores the cue against every key and adds every value in proportion to its score, so the values of matching keys dominate. Storing information and retrieving it later with a cue is what makes something a memory.
+**Memory** because \(A\) and \(B\) behave like a store that is written once and read many times. Training *writes* the pairs into the weights, where they stay fixed afterward. Inference *reads* from them: every input \(x\) acts as a cue. The layer does not pick a key; it scores the cue against every key and adds every value in proportion to its score, so the values of matching keys dominate.
 
-This is also a classic form. A matrix built as a sum of outer products, \(M = \sum_k v_k k_k^\top\), is the textbook **linear associative memory**: multiplying by an input \(x\) returns \(\sum_k v_k (k_k^\top x)\), each stored value weighted by how well \(x\) matches its key. \(BA = \sum_k b_k a_k^\top\) has exactly this form, with \(a_k\) as the keys and \(b_k\) as the values.
+**Associative** means retrieval by similarity rather than by exact address. A dictionary lookup fails unless the key matches exactly; here an input close to one key retrieves mostly that key's value, and an input between two keys retrieves a mixture.
 
-**Associative** means retrieval by similarity rather than by exact address. A dictionary lookup fails unless the key matches exactly; here every input is compared with every key, and each value is returned in proportion to its score. An input close to one key retrieves mostly that key's value, and an input between two keys retrieves a mixture.
-
-**Local** means the correction only matters near the keys. An input unrelated to what the adapter was trained on tends to be nearly perpendicular to every key, so every score is small and the layer behaves almost exactly like the frozen base model.
+**Local** means the correction only matters near the keys. An input unrelated to what the adapter was trained on scores low against every key, so almost nothing is added and the layer behaves like the frozen base model.
 
 For example, if a general-purpose model is fine-tuned on medical literature, one key might come to respond to heart-related inputs while its value adds a cardiology-flavored correction, and a cooking question would trigger almost nothing.
 
-<div class="explainer" data-explainer="lora-kv"></div>
+<div class="explainer" data-explainer="lora-lookup"></div>
 
 ## Training LoRA
 
