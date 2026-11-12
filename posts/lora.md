@@ -16,6 +16,14 @@ Fine-tuning changes a pretrained weight matrix \(W_0\) into \(W_0 + \Delta W\). 
 \Delta W = BA,\qquad B \in \mathbb{R}^{d \times r},\quad A \in \mathbb{R}^{r \times k},\quad r \ll \min(d, k)
 ```
 
+In the layer's forward pass, the frozen path and the learned path are added:
+
+```math
+y = W_0 x + \Delta W x = W_0 x + BAx
+```
+
+<div class="explainer" data-explainer="lora-diagram"></div>
+
 \(B\) is tall and skinny, \(A\) is short and wide, and their product has the same \(d \times k\) shape as \(W_0\). With \(d = k = 4096\) and \(r = 8\), the trainable count is \(4096 \times 8 + 8 \times 4096 = 65{,}536\), about \(0.39\%\) of the full matrix.
 
 In the [original LoRA paper](https://arxiv.org/abs/2106.09685), \(B\) is initialized to zero, so \(\Delta W = 0\) at the start and training begins exactly from the pretrained model. After training, \(BA\) can be added into \(W_0\), so the adapted layer runs as a single matrix with no extra inference cost. Keeping \(BA\) separate instead allows one frozen base model to be shared by many small task-specific adapters.
