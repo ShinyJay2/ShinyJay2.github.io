@@ -127,19 +127,9 @@ However, **in practice the terms mix positive and negative values, and their val
 
 ## Reading BA as keys and values
 
-Write the rows of \(A\) as \(a_1^\top, \dots, a_r^\top\) and the columns of \(B\) as \(b_1, \dots, b_r\). The correction \(BAx\) can then be computed in two steps.
+Write the rows of \(A\) as \(a_1^\top, \dots, a_r^\top\) and the columns of \(B\) as \(b_1, \dots, b_r\). Then the correction \(BAx\) splits into one term per pair, \(BAx = \sum_k b_k\,(a_k^\top x)\):
 
-**Step 1: \(Ax\).** Each row of \(A\) takes a dot product with \(x\), giving \(r\) numbers. With \(a_1 = (1, 0, 0)\), \(a_2 = (0, 1, 0)\), and \(x = (0.9, 0.1, 0.3)\):
-
-```math
-Ax = \begin{pmatrix} a_1^\top x \\ a_2^\top x \end{pmatrix} = \begin{pmatrix} 0.9 \\ 0.1 \end{pmatrix}
-```
-
-**Step 2: \(B(Ax)\).** Multiplying \(B\) by these numbers adds up the columns of \(B\), each weighted by its number:
-
-```math
-BAx = 0.9\,b_1 + 0.1\,b_2 \qquad\text{in general}\qquad BAx = \sum_{k=1}^{r} b_k\,(a_k^\top x)
-```
+<div class="explainer" data-explainer="lora-pairs"></div>
 
 Each index \(k\) is one pair:
 
