@@ -11,3 +11,12 @@ function paintAll(){document.querySelectorAll('.explainer input[type=range]').fo
 document.addEventListener('input',e=>{if(e.target.matches?.('.explainer input[type=range]'))paintRange(e.target)});
 new MutationObserver(paintAll).observe(document.documentElement,{childList:true,subtree:true});
 window.addEventListener('load',paintAll);
+// Code section: scroller buttons, edge masks, live star counts.
+(function(){const sc=document.querySelector('.repo-scroller');if(!sc)return;
+ const btns=document.querySelectorAll('.repo-btn');
+ const upd=()=>{const s=sc.scrollLeft<=2,e=sc.scrollLeft+sc.clientWidth>=sc.scrollWidth-2;sc.classList.toggle('is-start',s);sc.classList.toggle('is-end',e);btns.forEach(b=>b.disabled=b.dataset.dir==='-1'?s:e)};
+ btns.forEach(b=>b.addEventListener('click',()=>sc.scrollBy({left:+b.dataset.dir*(sc.clientWidth*.8)})));
+ sc.addEventListener('scroll',upd,{passive:true});addEventListener('resize',upd);upd();
+ const fmt=n=>n>=1000?(n/1000).toFixed(1).replace(/\.0$/,'')+'k':String(n);
+ fetch('https://api.github.com/users/ShinyJay2/repos?per_page=100').then(r=>r.ok?r.json():[]).then(list=>{const m=new Map(list.map(r=>[r.full_name.toLowerCase(),r.stargazers_count]));document.querySelectorAll('.repo-star-count').forEach(el=>{const v=m.get(el.dataset.repo.toLowerCase());if(v!=null)el.textContent=fmt(v)})}).catch(()=>{});
+})();
