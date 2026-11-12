@@ -106,6 +106,38 @@ function pairsWidget(el){
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
 
+
+// Initialization: which choices give dy = 0 and nonzero gradients at step 1
+function initWidget(el){
+ el.innerHTML=`<div class="viz-heading"><h3>Four ways to start</h3></div><p>Pick how <em>B</em> and <em>A</em> start. The figure shows the two matrices (an empty outline means all zeros), the correction <em>BAx</em> for a sample input before any training, and the size of each matrix's gradient at the first step. Numbers come from fixed illustrative matrices.</p>
+ <div class="viz-controls"><label>Initialization<select data-i aria-label="Initialization"><option value="rz">Random A, zero B</option><option value="zr">Zero A, random B</option><option value="rr">Random A, random B</option><option value="zz">Zero A, zero B</option></select></label></div>
+ <div class="viz-plot lora-diagram"></div><div class="viz-result" aria-live="polite"></div>`;
+ const q=s=>el.querySelector(s),D=6,R=2,c=17,gap=3,pad=6;
+ const r1=rng(91),r2=rng(57),r3=rng(13),r4=rng(29);
+ const Ar=[...Array(R)].map(()=>[...Array(D)].map(()=>r1()*2-1)),Br=[...Array(D)].map(()=>[...Array(R)].map(()=>r2()*2-1));
+ const x=[...Array(D)].map(()=>r3()*2-1),gv=[...Array(D)].map(()=>r4()*2-1);
+ const nrm=M=>Math.sqrt(M.flat().reduce((a,v)=>a+v*v,0));
+ const draw=()=>{const m=q('[data-i]').value,aR=m[0]==='r',bR=m[1]==='r';
+  const A=aR?Ar:Ar.map(r=>r.map(()=>0)),B=bR?Br:Br.map(r=>r.map(()=>0));
+  const z=A.map(row=>row.reduce((a,v,j)=>a+v*x[j],0)),dy=B.map(row=>row.reduce((a,v,k)=>a+v*z[k],0));
+  const gB=gv.map(gi=>z.map(zk=>gi*zk)),Btg=[...Array(R)].map((_,k)=>B.reduce((a,row,i)=>a+row[k]*gv[i],0)),gA=Btg.map(t=>x.map(xj=>t*xj));
+  const nDy=Math.hypot(...dy),nA=nrm(gA),nB=nrm(gB);
+  let g='',X=10;const top=30;
+  const block=(cols,rows,col,filled,lab,seed)=>{const w=cols*c+(cols-1)*gap+pad*2,h=rows*c+(rows-1)*gap+pad*2,x0=X;
+   g+=`<rect x="${x0}" y="${top}" width="${w}" height="${h}" rx="6" fill="${col}" fill-opacity="${filled?.1:0}" stroke="${col}" stroke-width="1.5" ${filled?'':'stroke-dasharray="4 4"'}/>`;
+   for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){const v=Math.abs(Math.sin((i+1)*(j+3)*seed));g+=filled?`<rect x="${x0+pad+j*(c+gap)}" y="${top+pad+i*(c+gap)}" width="${c}" height="${c}" rx="3" fill="${col}" fill-opacity="${0.3+0.6*v}"/>`:`<text x="${x0+pad+j*(c+gap)+c/2}" y="${top+pad+i*(c+gap)+c/2+4}" text-anchor="middle" style="fill:${col};font-family:KaTeX_Main,serif;font-size:11px;opacity:.7">0</text>`;}
+   g+=`<text x="${x0+w/2}" y="${top+h+26}" text-anchor="middle" style="fill:${col};font-family:KaTeX_Math,serif;font-style:italic;font-size:22px">${lab}</text><text x="${x0+w/2}" y="${top+h+44}" text-anchor="middle" style="fill:var(--muted);font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.12em">${filled?'RANDOM':'ZERO'}</text>`;
+   X+=w+8;return h;};
+  const h=block(R,D,'var(--m-orange)',bR,'B',1.3);block(D,R,'var(--viz-secondary)',aR,'A',2.1);
+  const L=X+40,W=230,mx=Math.max(nDy,nA,nB,1e-9),sc=v=>v/Math.max(mx,1.2)*W;
+  const row=(i,label,v,col,note)=>{const y=top+12+i*46;g+=`<text x="${L}" y="${y}" style="fill:var(--text);font-family:KaTeX_Main,serif;font-size:14px">${label}</text><rect x="${L}" y="${y+8}" width="${W}" height="10" rx="3" fill="var(--line)"/><rect x="${L}" y="${y+8}" width="${sc(v)}" height="10" rx="3" fill="${col}"/><text x="${L+W+8}" y="${y+17}" style="fill:${v<1e-9?'var(--m-red)':'var(--muted)'};font-family:KaTeX_Main,serif;font-size:13px">${v<1e-9?'0':v.toFixed(2)}</text>`;};
+  row(0,'correction BAx before training',nDy,'var(--m-purple)');row(1,'gradient reaching B at step 1',nB,'var(--m-orange)');row(2,'gradient reaching A at step 1',nA,'var(--viz-secondary)');
+  q('.viz-plot').innerHTML=`<svg viewBox="0 0 ${L+W+50} ${top+h+56}" role="img" aria-label="Initialization comparison">${g}</svg>`;
+  const verdict={rz:'Works, and is the LoRA default. The correction starts at zero. Only B learns at the first step; once B is nonzero, A learns too.',zr:'Also works. The correction starts at zero. Only A learns at the first step; B waits until A produces nonzero features.',rr:'Does not start from the pretrained model. The adapter already changes the output before any training.',zz:'Dead on arrival. The correction is zero, but so are both gradients, so nothing ever moves.'}[m];
+  q('.viz-result').innerHTML=`<strong>${({rz:'Random A, zero B',zr:'Zero A, random B',rr:'Random A, random B',zz:'Zero A, zero B'})[m]}.</strong> ${verdict}`;};
+ q('[data-i]').addEventListener('input',draw);draw();
+}
+
 // Key-value reading: correction = s1*b1 + s2*b2 with s_k = a_k . x
 const KEYS=[15,105];
 const VALS=[[0.8,0.5,-0.2,0.1],[-0.1,0.3,0.7,0.6]];
@@ -113,8 +145,8 @@ export function kvScores(theta,rel){return KEYS.map(k=>rel*Math.cos((theta-k)*Ma
 const ts=(base,sub,sup)=>`<tspan font-style="italic">${base}</tspan>${sub?`<tspan baseline-shift="sub" font-size="10">${sub}</tspan>`:''}${sup?`<tspan baseline-shift="super" font-size="10">${sup}</tspan>`:''}`;
 const hs=(base,sub,sup)=>`<em>${base}</em>${sub?`<sub>${sub}</sub>`:''}${sup?`<sup>${sup}</sup>`:''}`;
 function kvWidget(el){
- el.innerHTML=`<div class="viz-heading"><h3>Keys detect, values correct</h3></div><p>The left panel is the plane spanned by the two unit-length keys ${hs('a',1)} and ${hs('a',2)}. The input ${hs('x')} has length 1; relevance is how much of it lies in this plane, and the rest points in directions both keys ignore. Each similarity score ${hs('a','k','T')}${hs('x')} scales its value ${hs('b','k')}, and the bars on the right show the resulting correction to four output coordinates. All numbers are illustrative.</p>
- <div class="viz-controls"><label>Input direction in the key plane <output></output><input type="range" min="0" max="359" value="25" data-t aria-label="Input direction in degrees"></label><label>Relevance to the keys <output></output><input type="range" min="0" max="1" step="0.01" value="1" data-rel aria-label="Relevance"></label></div>
+ el.innerHTML=`<div class="viz-heading"><h3>Keys detect, values correct</h3></div><p>The left panel is the plane spanned by the two unit-length keys ${hs('a',1)} and ${hs('a',2)}. The input ${hs('x')} has length 1; "part the keys can see" is how much of x lies in this plane; the rest lies in directions that give a score of zero for both keys. Each similarity score ${hs('a','k','T')}${hs('x')} scales its value ${hs('b','k')}, and the bars on the right show the resulting correction to four output coordinates. All numbers are illustrative.</p>
+ <div class="viz-controls"><label>Input direction in the key plane <output></output><input type="range" min="0" max="359" value="25" data-t aria-label="Input direction in degrees"></label><label>Part of x the keys can see <output></output><input type="range" min="0" max="1" step="0.01" value="1" data-rel aria-label="Relevance"></label></div>
  <div class="viz-plot"></div><div class="viz-legend"><span><i style="background:var(--m-orange)"></i><span class="lg">${hs('a',1)}, ${hs('b',1)} contribution</span></span><span><i style="background:var(--viz-secondary)"></i><span class="lg">${hs('a',2)}, ${hs('b',2)} contribution</span></span><span><i style="background:var(--accent)"></i><span class="lg">input ${hs('x')} (projection)</span></span><span><i style="background:var(--m-green)"></i><span class="lg">total correction</span></span></div><div class="viz-result" aria-live="polite"></div>`;
  const q=s=>el.querySelector(s);
  const draw=()=>{const th=+q('[data-t]').value,rel=+q('[data-rel]').value;
@@ -141,5 +173,5 @@ function kvWidget(el){
   q('.viz-result').innerHTML=`Scores: ${hs('a',1,'T')}${hs('x')} = ${f(sc[0])}, ${hs('a',2,'T')}${hs('x')} = ${f(sc[1])}. Size of the correction \u2016\u0394${hs('y')}\u2016 = <strong>${norm.toFixed(2)}</strong>.<br>${rel<0.15?'The input is almost unrelated to both keys, so the adapter adds almost nothing and the layer behaves like the base model.':(()=>{const k=Math.abs(sc[0])>=Math.abs(sc[1])?0:1,o=1-k;if(Math.abs(sc[k])>0.85&&Math.abs(sc[o])<0.3)return sc[k]>0?`${hs('x')} is aligned with ${hs('a',k+1)}, so the correction is mostly ${hs('b',k+1)}.`:`${hs('x')} points opposite ${hs('a',k+1)}, so the score is negative and the correction mostly subtracts ${hs('b',k+1)}.`;return `Both keys respond, so the correction mixes ${hs('b',1)} and ${hs('b',2)}. A negative score subtracts its value.`})()}`;};
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
-const widgets={'lora-diagram':diagramWidget,'lora-pairs':pairsWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
+const widgets={'lora-diagram':diagramWidget,'lora-init':initWidget,'lora-pairs':pairsWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));
