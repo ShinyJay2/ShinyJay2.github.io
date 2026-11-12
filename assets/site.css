@@ -301,3 +301,26 @@ html:not([data-theme=dark]) .mx-body span.on{background:rgba(0,0,0,.06)}
 html:not([data-theme=dark]) .mx-body span.out{color:#fff}
 html:not([data-theme=dark]) .mx-op{color:#1d1d1f}
 html:not([data-theme=dark]) .mx-body span.dim{opacity:.6}
+
+/* ---------- Seamless figures: no card, sits on the page like a textbook figure ---------- */
+.explainer,html:not([data-theme=dark]) .explainer,html[data-theme=dark] .explainer{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible;margin:64px 0 72px}
+html[data-theme=dark] .explainer{--bg:#0d0b14;--panel:transparent}
+html:not([data-theme=dark]) .explainer{--bg:#fff;--panel:transparent}
+.explainer>.viz-heading,.explainer>p,.explainer .viz-controls,.explainer .viz-plot,.explainer .viz-result,.explainer .lora-terms,.lora-matrix{padding-left:0;padding-right:0}
+.explainer>.viz-heading{padding-top:0}
+.explainer .viz-legend{margin-left:0;margin-right:0}
+.explainer .table-scroll{margin:8px 0}
+.explainer>.viz-table{margin:12px 0!important;width:100%}
+.explainer .viz-controls,html:not([data-theme=dark]) .explainer .viz-controls{background:transparent;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-top:16px;padding-bottom:16px;margin-top:20px}
+.explainer .viz-result,.explainer .lora-terms,html:not([data-theme=dark]) .explainer .viz-result,html:not([data-theme=dark]) .explainer .lora-terms{background:transparent;border-top:1px solid var(--line);padding-top:14px;padding-bottom:0;font-size:15px}
+.explainer .viz-plot{padding-top:28px}
+.mx-row{padding-left:0;padding-right:0}
+html[data-theme=dark] .explainer{--line:#24212f}
+html:not([data-theme=dark]) .explainer{--line:#ebe9f0}
+.viz-controls select,html:not([data-theme=dark]) .viz-controls select{background-color:transparent}
+html[data-theme=dark] .viz-controls select{border-color:#2c2938}
+html[data-theme=dark] .viz-plot .primary-dot,html[data-theme=dark] .viz-plot .secondary-dot{stroke:#0d0b14}
+html[data-theme=dark] .viz-plot .target-dot{fill:#0d0b14}
+html[data-theme=dark] .rl-cell{background:transparent}
+html:not([data-theme=dark]) .rl-cell{background:transparent}
+@media(max-width:600px){.explainer>.viz-heading,.explainer>p,.explainer .viz-controls,.explainer .viz-plot,.explainer .viz-result,.explainer .lora-terms,.lora-matrix{padding-left:0;padding-right:0}.explainer .viz-legend{margin-left:0;margin-right:0}}
