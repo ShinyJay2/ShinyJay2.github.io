@@ -75,6 +75,37 @@ function diagramWidget(el){
  el.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',draw));draw();
 }
 
+
+// Pair diagram: y = W0 x + sum_k b_k (a_k^T x)
+function pairsWidget(el){
+ el.innerHTML=`<div class="viz-heading"><h3>The correction as key-value pairs</h3></div><p>Splitting <em>A</em> into rows and <em>B</em> into columns turns <em>BAx</em> into one term per pair. In each term, the key row and the input form a similarity score, a single number, which scales the value column.</p>
+ <div class="viz-controls"><label>Rank r (number of pairs) <output></output><input type="range" min="1" max="3" value="2" data-r aria-label="Rank r"></label></div>
+ <div class="viz-plot lora-diagram"></div>`;
+ const q=s=>el.querySelector(s),D=5,c=17,gap=3,pad=6;
+ const rnd=rng(41),VAL=[...Array(12)].map(()=>[...Array(12)].map(()=>0.25+0.75*rnd()));
+ const sub=n=>`<tspan font-size="13" baseline-shift="-5" style="font-family:KaTeX_Main,serif;font-style:normal">${n}</tspan>`;
+ const draw=()=>{const r=+q('[data-r]').value;q('.viz-controls output').textContent=r;
+  const top=74,Hm=D*c+(D-1)*gap+pad*2;let x=6,g='';
+  const block=(cols,rows,col,frozen,seed)=>{const w=cols*c+(cols-1)*gap+pad*2,h=rows*c+(rows-1)*gap+pad*2,x0=x;
+   g+=`<rect x="${x0}" y="${top}" width="${w}" height="${h}" rx="6" fill="${col}" fill-opacity="${frozen?.06:.1}" stroke="${col}" stroke-width="1.5" ${frozen?'stroke-dasharray="5 4" stroke-opacity=".7"':''}/>`;
+   for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){const v=VAL[(i+seed)%12][(j+seed*3)%12];g+=`<rect x="${x0+pad+j*(c+gap)}" y="${top+pad+i*(c+gap)}" width="${c}" height="${c}" rx="3" fill="${col}" fill-opacity="${frozen?0.12+0.3*v:0.3+0.65*v}"/>`;}
+   return {x0,w,cx:x0+w/2};};
+  const name=(cx,t,col,role)=>{g+=`<text x="${cx}" y="${top+Hm+28}" text-anchor="middle" style="fill:${col};font-family:KaTeX_Math,serif;font-style:italic;font-size:22px">${t}</text>`;if(role)g+=`<text x="${cx}" y="${top+Hm+48}" text-anchor="middle" style="fill:var(--muted);font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase">${role}</text>`;};
+  const op=t=>{g+=`<text x="${x+9}" y="${top+Hm/2+8}" text-anchor="middle" style="fill:var(--muted);font-family:KaTeX_Main,serif;font-size:24px">${t}</text>`;x+=28;};
+  let b=block(1,D,'var(--m-purple)',false,1);name(b.cx,'y','var(--m-purple)');x+=b.w+8;op('=');
+  b=block(D,D,'var(--m-teal)',true,2);name(b.cx,'W'+sub(0),'var(--m-teal)','frozen');x+=b.w+6;
+  b=block(1,D,'var(--accent)',false,4);name(b.cx,'x','var(--accent)');x+=b.w+8;
+  for(let k=1;k<=r;k++){op('+');
+   const bv=block(1,D,'var(--m-orange)',false,5+k);name(bv.cx,'b'+sub(k),'var(--m-orange)','value');x+=bv.w+6;
+   const ak=block(D,1,'var(--viz-secondary)',false,8+k);g+=`<text x="${ak.cx}" y="${top+c+pad*2+30}" text-anchor="middle" style="fill:var(--viz-secondary);font-family:KaTeX_Math,serif;font-style:italic;font-size:22px">a${sub(k)}<tspan font-size="13" baseline-shift="10" style="font-family:KaTeX_Main,serif;font-style:normal">\u22a4</tspan></text><text x="${ak.cx}" y="${top+c+pad*2+50}" text-anchor="middle" style="fill:var(--muted);font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase">key</text>`;x+=ak.w+6;
+   const xv=block(1,D,'var(--accent)',false,4);name(xv.cx,'x','var(--accent)');x+=xv.w+8;
+   const L=ak.x0,R=xv.x0+xv.w,mid=(L+R)/2,yb=top-10;
+   g+=`<path d="M${L} ${yb} q0 -8 8 -8 H${mid-8} q8 0 8 -8 q0 8 8 8 H${R-8} q8 0 8 8" fill="none" stroke="var(--text)" stroke-width="1.4" opacity=".7"/>`;
+   g+=`<text x="${mid}" y="${yb-28}" text-anchor="middle" style="fill:var(--text);font-family:KaTeX_Main,serif;font-size:16px">similarity score <tspan style="fill:var(--viz-secondary);font-family:KaTeX_Math,serif;font-style:italic">a${sub(k)}<tspan font-size="11" baseline-shift="8" style="font-family:KaTeX_Main,serif;font-style:normal">\u22a4</tspan></tspan><tspan style="fill:var(--accent);font-family:KaTeX_Math,serif;font-style:italic">x</tspan></text>`;}
+  q('.viz-plot').innerHTML=`<svg viewBox="0 0 ${x} ${top+Hm+60}" role="img" aria-label="y equals W0 x plus ${r} terms, each a value column b_k times the similarity score a_k transpose x">${g}</svg>`;};
+ el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
+}
+
 // Key-value reading: correction = s1*b1 + s2*b2 with s_k = a_k . x
 const KEYS=[15,105];
 const VALS=[[0.8,0.5,-0.2,0.1],[-0.1,0.3,0.7,0.6]];
@@ -110,5 +141,5 @@ function kvWidget(el){
   q('.viz-result').innerHTML=`Scores: ${hs('a',1,'T')}${hs('x')} = ${f(sc[0])}, ${hs('a',2,'T')}${hs('x')} = ${f(sc[1])}. Size of the correction \u2016\u0394${hs('y')}\u2016 = <strong>${norm.toFixed(2)}</strong>.<br>${rel<0.15?'The input is almost unrelated to both keys, so the adapter adds almost nothing and the layer behaves like the base model.':(()=>{const k=Math.abs(sc[0])>=Math.abs(sc[1])?0:1,o=1-k;if(Math.abs(sc[k])>0.85&&Math.abs(sc[o])<0.3)return sc[k]>0?`${hs('x')} is aligned with ${hs('a',k+1)}, so the correction is mostly ${hs('b',k+1)}.`:`${hs('x')} points opposite ${hs('a',k+1)}, so the score is negative and the correction mostly subtracts ${hs('b',k+1)}.`;return `Both keys respond, so the correction mixes ${hs('b',1)} and ${hs('b',2)}. A negative score subtracts its value.`})()}`;};
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
-const widgets={'lora-diagram':diagramWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
+const widgets={'lora-diagram':diagramWidget,'lora-pairs':pairsWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));
