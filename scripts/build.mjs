@@ -46,7 +46,7 @@ function seriesNav(post){
 }
 for(const post of posts){algorithmNumber=0;const html=marked.parse(post.content).replace(/<table>/g,'<div class="table-scroll"><table>').replace(/<\/table>/g,'</table></div>');write(post.url,layout(post.title,`<header class="post-header"><p><a href="/blog/">← All posts</a></p><h1>${esc(post.title)}</h1><div class="meta post-meta"><time datetime="${post.date}">${dateLabel(post.date)}</time><span>${post.minutes} min read</span><span>${esc(post.category)}</span></div></header>${chapterLinks(post)}<article class="article">${html}</article>${seriesNav(post)}<p style="margin-top:40px"><a href="/blog/">← Back to blog</a></p>`,post.url,post.description))}
 // Preserve previously published URLs after separating standalone articles from the series.
-for(const [oldSlug,slug] of Object.entries({'rl-09-a3c':'a3c','rl-10-impala':'impala','rl-11-ppo':'ppo'})){
+for(const [oldSlug,slug] of Object.entries({'rl-09-a3c':'a3c','rl-10-impala':'impala','rl-11-ppo':'ppo','lora-scaling-factor':'lora'})){
  const url=`/blog/${slug}/`;
  write(`/blog/${oldSlug}/`,`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${url}"><link rel="canonical" href="${origin}${url}"><meta name="robots" content="noindex"><title>Article moved</title></head><body><p>This article is now at <a href="${url}">${url}</a>.</p></body></html>`);
 }
