@@ -134,13 +134,13 @@ Write the rows of \(A\) as \(a_1^\top, \dots, a_r^\top\) and the columns of \(B\
 Each index \(k\) is one pair:
 
 - **\(a_k\) is a key.** \(a_k^\top x\) is a similarity score: large when \(x\) points along \(a_k\), near zero when it is perpendicular, negative when it points the other way. A key "responds" to an input when this score is large. The score is computed in every forward pass, during training and after it, and needs no label or loss.
-- **\(b_k\) is a value.** It is a fixed vector with the size of the output. The score only scales it, so each pair always pushes the output along the same direction, harder or softer, and a negative score subtracts it.
+- **\(b_k\) is a value.** In a key-value store, the key is what an input is compared against and the value is what comes back. Here \(b_k\) is what comes back: a vector with the size of the output that gets added to it. During training, \(b_k\) stores the correction learned from the training set; at use time, that correction is added with weight \(a_k^\top x\). The key decides *how much*, the value decides *what*. For example, if \(W_0 x = (1.0, 2.0, 0.5)\), \(b_1 = (0.3, -0.1, 0.2)\), and the score is \(0.9\), the output becomes \((1.0, 2.0, 0.5) + 0.9\,b_1 = (1.27, 1.91, 0.68)\). With a score of \(0\), it stays \((1.0, 2.0, 0.5)\).
 
 This is not extra machinery; it is the same \(BAx\) read in two steps. The structure exists from the first step of training. What training adds is meaning. \(B\) starts at zero, so every value is zero, and the random rows of \(A\) detect nothing in particular. Gradient descent then moves each \(b_k\) toward the correction that lowers the loss on inputs where \(a_k\) scores high, and moves each \(a_k\) toward inputs where adding \(b_k\) helped. After training, a key scores high on the kinds of inputs whose outputs needed correcting, and its value is that correction. The rank \(r\) is the number of such pairs.
 
 ## Why this is called a local associative memory
 
-**Memory** because \(A\) and \(B\) behave like a store that is written once and read many times. Training *writes* pairs into it: each key \(a_k\) and its value \(b_k\) are stored in the weights and stay fixed afterward. Inference *reads* from it: every input \(x\) acts as a cue, and the layer returns the values whose keys match that cue. Storing information and retrieving it later with a cue is what makes something a memory.
+**Memory** because \(A\) and \(B\) behave like a store that is written once and read many times. Training *writes* pairs into it: each key \(a_k\) and its value \(b_k\) are stored in the weights and stay fixed afterward. Inference *reads* from it: every input \(x\) acts as a cue. The layer does not pick a key; it scores the cue against every key and adds every value in proportion to its score, so the values of matching keys dominate. Storing information and retrieving it later with a cue is what makes something a memory.
 
 This is also a classic form. A matrix built as a sum of outer products, \(M = \sum_k v_k k_k^\top\), is the textbook **linear associative memory**: multiplying by an input \(x\) returns \(\sum_k v_k (k_k^\top x)\), each stored value weighted by how well \(x\) matches its key. \(BA = \sum_k b_k a_k^\top\) has exactly this form, with \(a_k\) as the keys and \(b_k\) as the values.
 
@@ -152,8 +152,41 @@ For example, if a general-purpose model is fine-tuned on medical literature, one
 
 <div class="explainer" data-explainer="lora-kv"></div>
 
-Three caveats keep this interpretation honest:
+## Training LoRA
 
-- Learned keys need not match human concepts; one key can respond to a mixture of features.
-- Unrelated inputs give small scores, not exactly zero ones.
-- \(x\) is the hidden vector entering the layer, not raw text, and the full correction is still scaled by \(\alpha / r\).
+### Starting from zero
+
+At the first training step, the adapted model should behave exactly like the pretrained one. The correction \(\Delta y = BAx\) must therefore be zero for every input. If both \(B\) and \(A\) were drawn at random, \(\Delta y\) would generally not be zero: the adapter would change the model's outputs before learning anything, which can destabilize training and interfere with what the pretrained model already knows. Any correction should come from fine-tuning, not from random initialization.
+
+Making \(\Delta y\) zero only requires one of the two matrices to be zero. Making both zero is not an option, because of how the gradients flow. Write \(z = Ax\) for the \(r\) scores and \(g\) for the gradient of the loss with respect to \(\Delta y\). Then
+
+```math
+\frac{\partial L}{\partial B} = g\, z^\top = g\,(Ax)^\top, \qquad \frac{\partial L}{\partial A} = B^\top g\, x^\top
+```
+
+- The gradient of \(B\) contains \(A\). If \(A = 0\), \(B\) gets no gradient.
+- The gradient of \(A\) contains \(B\). If \(B = 0\), \(A\) gets no gradient.
+- If both are zero, neither moves. The adapter never learns.
+
+So exactly one matrix starts at zero and the other starts random. Either choice keeps \(\Delta y = 0\) at the start, and in either case only one matrix receives a gradient at the first step. After that step both are nonzero and both learn.
+
+<div class="explainer" data-explainer="lora-init"></div>
+
+### Why random A and zero B
+
+LoRA normally uses random \(A\) and zero \(B\). The roles from the previous sections explain why. \(A\) is the feature extractor: it projects the input into the \(r\) low-rank features. \(B\) maps those features back to the output space as corrections.
+
+- **Random \(A\), zero \(B\).** From the first step, \(A\) already produces \(r\) diverse, nonzero features for every input. \(B\)'s gradient \(g\,(Ax)^\top\) is immediately informative: it learns which correction to attach to each of those features. Once \(B\) moves away from zero, \(A\) starts learning too and refines the features.
+- **Zero \(A\), random \(B\).** Every feature \(Ax\) starts at zero and only grows as \(A\) learns, step by step. Until then, \(B\) receives a weak and less diverse signal.
+
+In key-value terms, random \(A\) starts with \(r\) keys that already respond to inputs in different ways, while zero \(B\) starts with empty values. Training only has to fill in what each key should retrieve. This is an intuition rather than a theorem; [an analysis of LoRA initialization](https://arxiv.org/abs/2406.08447) also reports that random \(A\) with zero \(B\) tolerates larger learning rates and tends to perform better than the reverse.
+
+### Different learning rates for A and B
+
+Because \(A\) and \(B\) play different roles, they need not share a learning rate. [LoRA+](https://arxiv.org/abs/2402.12354) gives \(B\) a larger learning rate than \(A\):
+
+```math
+\eta_B = \lambda\, \eta_A, \qquad \lambda > 1
+```
+
+The reason is a mismatch in scale. \(A\) maps a wide input down to a few dimensions, and \(B\) maps those few dimensions back up to the full output. With a single learning rate, \(B\) tends to be undertrained. Raising \(B\)'s learning rate keeps the two matrices learning at a matched pace, which speeds up fine-tuning and often improves the final result without adding any parameters.
