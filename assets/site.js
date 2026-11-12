@@ -1,5 +1,5 @@
 const toggle = document.querySelector('.theme');
-function updateThemeLabel(){const dark=document.documentElement.dataset.theme==='dark';toggle.textContent=dark?'☼':'◐';toggle.setAttribute('aria-label',dark?'Switch to light theme':'Switch to dark theme');}
+function updateThemeLabel(){const dark=document.documentElement.dataset.theme==='dark';toggle.querySelector('.theme-icon').textContent=dark?'☾':'☼';toggle.querySelector('.theme-label').textContent=dark?'Light':'Dark';toggle.setAttribute('aria-label',dark?'Switch to light theme':'Switch to dark theme');}
 updateThemeLabel();
 toggle.addEventListener('click',()=>{const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;try{localStorage.setItem('theme',next)}catch{}updateThemeLabel()});
 const search=document.querySelector('#search');
