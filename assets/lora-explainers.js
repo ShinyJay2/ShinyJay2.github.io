@@ -38,5 +38,41 @@ function scaleWidget(el){
   q('.viz-result').innerHTML=`r = ${r}, \u03b1 = ${al}, scaling factor \u03b1 / r = ${fmt(al/r,3)}<br>RMS entry of BA: ${fmt(raw[r-1],4)}. After scaling: ${fmt(sc[r-1],4)}.<br>${eq?'Every entry of BA equals 0.1 \u00d7 r, so dividing by r returns 0.1 and the scaled update stays at 0.1 \u00d7 \u03b1 for every rank.':'With mixed signs, terms partly cancel. The unscaled size no longer grows in proportion to r, so dividing by r does not hold the scaled size exactly constant.'}`;};
  el.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',draw));draw();
 }
-const widgets={'lora-sum':sumWidget,'lora-scale':scaleWidget};
+
+// Key-value reading: correction = s1*b1 + s2*b2 with s_k = a_k . x
+const KEYS=[15,105];
+const VALS=[[0.8,0.5,-0.2,0.1],[-0.1,0.3,0.7,0.6]];
+export function kvScores(theta,rel){return KEYS.map(k=>rel*Math.cos((theta-k)*Math.PI/180));}
+const ts=(base,sub,sup)=>`<tspan font-style="italic">${base}</tspan>${sub?`<tspan baseline-shift="sub" font-size="10">${sub}</tspan>`:''}${sup?`<tspan baseline-shift="super" font-size="10">${sup}</tspan>`:''}`;
+const hs=(base,sub,sup)=>`<em>${base}</em>${sub?`<sub>${sub}</sub>`:''}${sup?`<sup>${sup}</sup>`:''}`;
+function kvWidget(el){
+ el.innerHTML=`<div class="viz-heading"><h3>Keys detect, values correct</h3></div><p>The left panel is the plane spanned by the two unit-length keys ${hs('a',1)} and ${hs('a',2)}. The input ${hs('x')} has length 1; relevance is how much of it lies in this plane, and the rest points in directions both keys ignore. Each similarity score ${hs('a','k','T')}${hs('x')} scales its value ${hs('b','k')}, and the bars on the right show the resulting correction to four output coordinates. All numbers are illustrative.</p>
+ <div class="viz-controls"><label>Input direction in the key plane <output></output><input type="range" min="0" max="359" value="25" data-t aria-label="Input direction in degrees"></label><label>Relevance to the keys <output></output><input type="range" min="0" max="1" step="0.01" value="1" data-rel aria-label="Relevance"></label></div>
+ <div class="viz-plot"></div><div class="viz-legend"><span><i style="background:var(--m-orange)"></i><span class="lg">${hs('a',1)}, ${hs('b',1)} contribution</span></span><span><i style="background:var(--viz-secondary)"></i><span class="lg">${hs('a',2)}, ${hs('b',2)} contribution</span></span><span><i style="background:var(--accent)"></i><span class="lg">input ${hs('x')} (projection)</span></span><span><i style="background:var(--m-green)"></i><span class="lg">total correction</span></span></div><div class="viz-result" aria-live="polite"></div>`;
+ const q=s=>el.querySelector(s);
+ const draw=()=>{const th=+q('[data-t]').value,rel=+q('[data-rel]').value;
+  el.querySelectorAll('.viz-controls output').forEach((o,n)=>o.textContent=n?rel.toFixed(2):th+'\u00b0');
+  const sc=kvScores(th,rel),dy=VALS[0].map((v,j)=>sc[0]*v+sc[1]*VALS[1][j]);
+  const cx=115,cy=140,R=90,pt=(a,l)=>[cx+R*l*Math.cos(a*Math.PI/180),cy-R*l*Math.sin(a*Math.PI/180)];
+  const arrow=(a,l,col,w,lab)=>{const [x,y]=pt(a,l),[lx,ly]=pt(a,Math.max(l,.25)+.22);return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="${w+1.2}" fill="${col}"/><text x="${lx}" y="${ly+5}" text-anchor="middle" style="fill:${col};font-size:15px">${lab}</text>`};
+  let svg=`<circle class="unit-circle" cx="${cx}" cy="${cy}" r="${R}"/><line class="axis" x1="${cx-R-12}" y1="${cy}" x2="${cx+R+12}" y2="${cy}" style="opacity:.25"/><line class="axis" x1="${cx}" y1="${cy-R-12}" x2="${cx}" y2="${cy+R+12}" style="opacity:.25"/>`;
+  svg+=arrow(KEYS[0],1,'var(--m-orange)',2,ts('a',1))+arrow(KEYS[1],1,'var(--viz-secondary)',2,ts('a',2))+arrow(th,Math.max(rel,0.001),'var(--accent)',3,ts('x'));
+  svg+=`<text x="${cx}" y="${cy+R+36}" text-anchor="middle">key plane</text>`;
+  const L=300,Rr=540,mid=(L+Rr)/2,half=(Rr-L)/2;
+  const sx=v=>mid+v*(half-44);
+  svg+=`<text x="${L-40}" y="24">similarity scores</text>`;
+  sc.forEach((v,k)=>{const y=40+k*30,col=k?'var(--viz-secondary)':'var(--m-orange)';svg+=`<rect x="${Math.min(mid,sx(v))}" y="${y}" width="${Math.abs(sx(v)-mid)}" height="16" fill="${col}" rx="2"/><text x="${L-10}" y="${y+13}" text-anchor="end">${ts('a',k+1,'T')}${ts('x')}</text><text x="${v>=0?sx(v)+6:sx(v)-6}" y="${y+13}" text-anchor="${v>=0?'start':'end'}">${(v>=0?'+':'\u2212')+Math.abs(v).toFixed(2)}</text>`;});
+  svg+=`<line class="axis" x1="${mid}" y1="34" x2="${mid}" y2="102"/>`;
+  svg+=`<text x="${L-40}" y="138">correction ${ts('\u0394y')} = ${ts('s',1)}${ts('b',1)} + ${ts('s',2)}${ts('b',2)}</text>`;
+  const top=152,rowH=30,sy=v=>mid+v*(half-8)/1.1;
+  dy.forEach((v,j)=>{const y=top+j*rowH,c1=sc[0]*VALS[0][j],c2=sc[1]*VALS[1][j];
+   svg+=`<rect x="${Math.min(mid,sy(c1))}" y="${y}" width="${Math.abs(sy(c1)-mid)}" height="7" fill="var(--m-orange)" opacity=".8" rx="1"/><rect x="${Math.min(mid,sy(c2))}" y="${y+8}" width="${Math.abs(sy(c2)-mid)}" height="7" fill="var(--viz-secondary)" opacity=".8" rx="1"/><rect x="${Math.min(mid,sy(v))}" y="${y+16}" width="${Math.abs(sy(v)-mid)}" height="6" fill="var(--m-green)" rx="1"/><text x="${L-10}" y="${y+16}" text-anchor="end">${ts('y',j+1)}</text>`;});
+  svg+=`<line class="axis" x1="${mid}" y1="${top-4}" x2="${mid}" y2="${top+4*rowH-4}"/>`;
+  q('.viz-plot').innerHTML=`<svg viewBox="0 0 560 290" role="img" aria-label="Key plane with input direction, similarity scores, and resulting correction">${svg}</svg>`;
+  const norm=Math.hypot(...dy);
+  const f=v=>(v>=0?'':'\u2212')+Math.abs(v).toFixed(2);
+  q('.viz-result').innerHTML=`Scores: ${hs('a',1,'T')}${hs('x')} = ${f(sc[0])}, ${hs('a',2,'T')}${hs('x')} = ${f(sc[1])}. Size of the correction \u2016\u0394${hs('y')}\u2016 = <strong>${norm.toFixed(2)}</strong>.<br>${rel<0.15?'The input is almost unrelated to both keys, so the adapter adds almost nothing and the layer behaves like the base model.':(()=>{const k=Math.abs(sc[0])>=Math.abs(sc[1])?0:1,o=1-k;if(Math.abs(sc[k])>0.85&&Math.abs(sc[o])<0.3)return sc[k]>0?`${hs('x')} is aligned with ${hs('a',k+1)}, so the correction is mostly ${hs('b',k+1)}.`:`${hs('x')} points opposite ${hs('a',k+1)}, so the score is negative and the correction mostly subtracts ${hs('b',k+1)}.`;return `Both keys respond, so the correction mixes ${hs('b',1)} and ${hs('b',2)}. A negative score subtracts its value.`})()}`;};
+ el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
+}
+const widgets={'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));
