@@ -51,7 +51,7 @@ In short, **\(r\) is the capacity available to express the correction, and \(\al
 
 \(r\) is the rank chosen for LoRA. Strictly speaking, it is a setting that makes the rank of \(BA\) **at most \(r\)**.
 
-When \(r=2\), as in the slide:
+When \(r=2\):
 
 - **B has 2 columns**: two tall vertical strips;
 - **A has 2 rows**: two long horizontal strips.
@@ -149,7 +149,7 @@ An **associative memory** is retrieved by content rather than by address: an inp
 
 It is called **local** because the retrieval only matters near the keys. If an input is unrelated to the fine-tuning domain, it tends to be nearly perpendicular to every key, the similarity scores stay small, and the adapter adds little correction. The base model keeps its general behavior, and LoRA acts as a compact, task-specific memory bank on top of it.
 
-The video illustrates this with a hypothetical medical fine-tune: \(a_1\) might detect heart-disease questions while \(b_1\) adds cardiology knowledge, and \(a_2\) might detect diabetes questions while \(b_2\) adds diabetes knowledge.
+For example, suppose a general-purpose model is fine-tuned on medical literature. The key \(a_1\) might detect heart-disease questions while the value \(b_1\) adds cardiology knowledge, and the key \(a_2\) might detect diabetes questions while the value \(b_2\) adds diabetes knowledge.
 
 <div class="explainer" data-explainer="lora-kv"></div>
 
