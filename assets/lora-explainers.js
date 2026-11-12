@@ -138,6 +138,51 @@ function initWidget(el){
  q('[data-i]').addEventListener('input',draw);draw();
 }
 
+
+// Lookup: input -> score against each key -> scale each value -> sum = correction
+function lookupWidget(el){
+ const KEYS=[[1,0,0],[0,1,0]],VALS=[[0.3,-0.1,0.2],[-0.1,0.3,0.4]];
+ const PRESETS={chest:[0.9,0.1,0.3],sugar:[0.6,0.7,0.2],cook:[0,0,1]};
+ el.innerHTML=`<div class="viz-heading"><h3>One lookup, step by step</h3></div><p>A toy adapter with two keys and two values. Pretend the input has three features meaning heart-related, diabetes-related, and something else; real hidden features are not this tidy. Pick an input or move the sliders, then read the figure left to right: compare the input with each key, scale each value by its score, and add.</p>
+ <div class="viz-controls"><label>Input<select data-p aria-label="Input"><option value="chest">A chest-pain question</option><option value="sugar">Blood sugar after heart surgery</option><option value="cook">A cooking question</option></select></label><label>heart-related <output></output><input type="range" min="0" max="1" step="0.05" data-x="0" aria-label="heart-related"></label><label>diabetes-related <output></output><input type="range" min="0" max="1" step="0.05" data-x="1" aria-label="diabetes-related"></label><label>something else <output></output><input type="range" min="0" max="1" step="0.05" data-x="2" aria-label="something else"></label></div>
+ <div class="viz-plot lora-diagram"></div><div class="viz-result" aria-live="polite"></div>`;
+ const q=s=>el.querySelector(s),cs=34,f=v=>(v<0?'\u2212':'')+Math.abs(v).toFixed(2);
+ const T=(x,y,t,st='')=>`<text x="${x}" y="${y}" text-anchor="middle" style="font-family:KaTeX_Main,serif;font-size:13px;fill:var(--text);${st}">${t}</text>`;
+ const cell=(x,y,v,col,max=1,w=cs,h=26)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${col}" fill-opacity="${0.08+0.8*Math.min(1,Math.abs(v)/max)}" stroke="${col}" stroke-opacity=".5"/>`+T(x+w/2,y+h/2+5,f(v).replace('.00',''),Math.abs(v)/max>.55?'fill:#fff':'');
+ const head=(x,y,t)=>`<text x="${x}" y="${y}" text-anchor="middle" style="font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.1em;fill:var(--muted)">${t}</text>`;
+ const mt=(x,y,t,col,sz=18)=>`<text x="${x}" y="${y}" text-anchor="middle" style="font-family:KaTeX_Math,serif;font-style:italic;font-size:${sz}px;fill:${col}">${t}</text>`;
+ const setX=v=>{el.querySelectorAll('[data-x]').forEach((r,i)=>{r.value=v[i]});};
+ const draw=()=>{const xv=[...el.querySelectorAll('[data-x]')].map(r=>+r.value);el.querySelectorAll('.viz-controls output').forEach((o,i)=>o.textContent=xv[i].toFixed(2));
+  const sc=KEYS.map(k=>k.reduce((a,v,j)=>a+v*xv[j],0)),con=VALS.map((b,k)=>b.map(v=>v*sc[k])),cor=[0,1,2].map(i=>con[0][i]+con[1][i]);
+  let g='';const top=40,rowY=[top+20,top+150];
+  // column x
+  g+=head(40,top-12,'INPUT x');['heart','diabetes','other'].forEach((l,i)=>{g+=cell(23,top+20+i*40,xv[i],'var(--accent)');g+=`<text x="16" y="${top+38+i*40}" text-anchor="end" style="font-family:var(--ui);font-size:10px;fill:var(--muted)">${l}</text>`;});
+  // per key rows
+  g+=head(185,top-12,'1. COMPARE WITH EACH KEY');g+=head(420,top-12,'2. SCALE EACH VALUE');g+=head(612,top-12,'3. ADD');
+  [0,1].forEach(k=>{const y=rowY[k],kc='var(--viz-secondary)',vc='var(--m-orange)';
+   g+=`<path d="M${23+cs} ${top+20+50} C ${80} ${top+70}, ${80} ${y+13}, ${105} ${y+13}" fill="none" stroke="var(--muted)" stroke-opacity=".5"/>`;
+   g+=mt(122,y+18,`a<tspan font-size="11" baseline-shift="-4">${k+1}</tspan>`,kc,17);
+   KEYS[k].forEach((v,j)=>g+=cell(140+j*(cs+4),y,v,kc));
+   g+=T(273,y+18,'\u00b7 x =','font-size:15px');
+   g+=`<rect x="290" y="${y-2}" width="50" height="30" rx="6" fill="var(--viz-secondary)" fill-opacity="${0.12+0.75*Math.min(1,Math.abs(sc[k]))}"/>`+T(315,y+18,f(sc[k]),`font-size:15px;${Math.abs(sc[k])>.55?'fill:#fff':''}`);
+   g+=`<text x="315" y="${y+46}" text-anchor="middle" style="font-family:var(--ui);font-size:10px;fill:var(--muted)">score s${k+1}</text>`;
+   g+=T(360,y+18,'\u00d7','font-size:16px');
+   VALS[k].forEach((v,i)=>g+=cell(376,y-30+i*30,v,vc,0.4,cs,24));g+=mt(393,y+76,`b<tspan font-size="11" baseline-shift="-4">${k+1}</tspan>`,vc,17);
+   g+=T(430,y+18,'=','font-size:16px');
+   con[k].forEach((v,i)=>g+=cell(446,y-30+i*30,v,vc,0.4,cs+10,24));
+   g+=`<text x="${468}" y="${y+76}" text-anchor="middle" style="font-family:KaTeX_Main,serif;font-size:13px;fill:var(--muted)">s${k+1} b${k+1}</text>`;
+   g+=`<path d="M${446+cs+12} ${y+13} C ${530} ${y+13}, ${540} ${top+105}, ${585} ${top+105}" fill="none" stroke="var(--muted)" stroke-opacity=".5"/>`;
+  });
+  cor.forEach((v,i)=>g+=cell(590,top+62+i*32,v,'var(--m-green)',0.5,cs+12,26));
+  g+=`<text x="613" y="${top+176}" text-anchor="middle" style="font-family:KaTeX_Math,serif;font-style:italic;font-size:17px;fill:var(--m-green)">BAx</text><text x="613" y="${top+194}" text-anchor="middle" style="font-family:var(--ui);font-size:10px;fill:var(--muted)">correction</text>`;
+  q('.viz-plot').innerHTML=`<svg viewBox="0 0 712 ${top+260}" role="img" aria-label="Input compared with two keys, values scaled by scores and summed into the correction"><g transform="translate(52,0)">${g}</g></svg>`;
+  const mag=Math.hypot(...cor),dom=Math.abs(sc[0])>Math.abs(sc[1])?1:2;
+  q('.viz-result').innerHTML=`Scores: s<sub>1</sub> = ${f(sc[0])}, s<sub>2</sub> = ${f(sc[1])}. Correction = ${f(sc[0])}\u00b7b<sub>1</sub> + ${f(sc[1])}\u00b7b<sub>2</sub> = (${cor.map(f).join(', ')}).<br>${mag<0.05?'The input matches neither key, so almost nothing is added: the layer acts like the base model. This is what <em>local</em> means.':Math.min(Math.abs(sc[0]),Math.abs(sc[1]))>0.4?'The input matches both keys, so it retrieves a mixture of both values. This is what <em>associative</em> means: retrieval by similarity, not by an exact match.':`The input mostly matches key ${dom}, so the correction is mostly value ${dom}, even though this exact input was never stored.`}`;};
+ q('[data-p]').addEventListener('input',e=>{setX(PRESETS[e.target.value]);draw();});
+ el.querySelectorAll('[data-x]').forEach(r=>r.addEventListener('input',draw));
+ setX(PRESETS.chest);draw();
+}
+
 // Key-value reading: correction = s1*b1 + s2*b2 with s_k = a_k . x
 const KEYS=[15,105];
 const VALS=[[0.8,0.5,-0.2,0.1],[-0.1,0.3,0.7,0.6]];
@@ -173,5 +218,5 @@ function kvWidget(el){
   q('.viz-result').innerHTML=`Scores: ${hs('a',1,'T')}${hs('x')} = ${f(sc[0])}, ${hs('a',2,'T')}${hs('x')} = ${f(sc[1])}. Size of the correction \u2016\u0394${hs('y')}\u2016 = <strong>${norm.toFixed(2)}</strong>.<br>${rel<0.15?'The input is almost unrelated to both keys, so the adapter adds almost nothing and the layer behaves like the base model.':(()=>{const k=Math.abs(sc[0])>=Math.abs(sc[1])?0:1,o=1-k;if(Math.abs(sc[k])>0.85&&Math.abs(sc[o])<0.3)return sc[k]>0?`${hs('x')} is aligned with ${hs('a',k+1)}, so the correction is mostly ${hs('b',k+1)}.`:`${hs('x')} points opposite ${hs('a',k+1)}, so the score is negative and the correction mostly subtracts ${hs('b',k+1)}.`;return `Both keys respond, so the correction mixes ${hs('b',1)} and ${hs('b',2)}. A negative score subtracts its value.`})()}`;};
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
-const widgets={'lora-diagram':diagramWidget,'lora-init':initWidget,'lora-pairs':pairsWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
+const widgets={'lora-diagram':diagramWidget,'lora-lookup':lookupWidget,'lora-init':initWidget,'lora-pairs':pairsWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));
