@@ -362,3 +362,8 @@ html:not([data-theme=dark]) .rl-cell{background:transparent}
 .explainer em{font-style:italic}
 .viz-legend span.lg{display:inline}
 .lora-diagram svg{max-width:640px}
+.lookup-q{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin:22px 0 0;font-family:var(--m-serif,serif);font-size:16px}
+.lookup-q .lq-label{font-family:var(--ui);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lookup-q .lq-text{color:var(--text)}
+.lookup-q .lq-arrow{color:var(--muted);font-size:14px}
+.lookup-q .lq-x{color:var(--accent)}
