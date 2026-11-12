@@ -144,6 +144,13 @@ The first term is the original output before adaptation. The remaining terms are
 - \(a_k^\top x\) is **a single number**: the dot product between the input and \(a_k\). It is large when \(x\) points in the same direction as \(a_k\), close to zero when \(x\) is nearly perpendicular to it, and negative when \(x\) points the opposite way. It works as a **similarity score**, so \(a_k\) behaves like a **key**, or a feature detector.
 - \(b_k\) is **a vector with the size of the output**. It is the correction that gets added, multiplied by that score. It plays the role of the **value**.
 
+The value deserves a closer look. Where \(a_k\) lives in the input space and decides *when* to act, \(b_k\) lives in the output space and decides *what* changes:
+
+- **\(b_k\) is fixed after training.** It does not depend on the input. The only thing that varies from input to input is the score multiplying it. So each pair can only ever push the output along one fixed direction, \(b_k\), harder or softer.
+- **The score sets the amount and the sign.** With \(b_1 = (0.8, 0.5, -0.2, 0.1)\), a score of \(0.9\) adds \((0.72, 0.45, -0.18, 0.09)\) to the output, a score of \(0.1\) adds only \((0.08, 0.05, -0.02, 0.01)\), and a score of \(-0.5\) subtracts \((0.4, 0.25, -0.1, 0.05)\).
+- **"Adding knowledge" means nudging a hidden vector.** The output \(y\) of an adapted layer is not text; it is passed on to the next layers. Adding \(b_k\) moves that hidden vector in a particular direction, and the layers after it are what turn that shift into different behavior. Saying that \(b_1\) "adds cardiology knowledge" is shorthand for: \(b_1\) shifts the representation in a direction that the rest of the network turns into cardiology-like outputs.
+- **Shapes.** For \(W_0 \in \mathbb{R}^{d \times k}\), each key \(a_k\) has \(k\) entries (the input size) and each value \(b_k\) has \(d\) entries (the output size).
+
 So the correction is "for every key, measure how strongly the input matches it, and add that key's value in proportion." This is the same sum of \(r\) terms from earlier, now grouped by the index \(k\): one term per key-value pair. The rank \(r\) is therefore also the number of key-value pairs the adapter can hold.
 
 A small example makes this concrete. Let \(a_1 = (1, 0, 0)\) and \(a_2 = (0, 1, 0)\).
@@ -153,7 +160,21 @@ A small example makes this concrete. Let \(a_1 = (1, 0, 0)\) and \(a_2 = (0, 1, 
 
 ## Why this is called a local associative memory
 
-An **associative memory** is retrieved by content rather than by address: an input that resembles a stored key brings back the value stored with it. In LoRA, the key-value pairs are the rows of \(A\) and the columns of \(B\). An input that matches \(a_k\) retrieves \(b_k\).
+An **associative memory** is retrieved by content rather than by address.
+
+An ordinary lookup, such as a Python dictionary, needs the exact key. `memory["heart disease"]` returns its value, but `memory["chest pain"]` fails, even though the two are related. There is no notion of "close to a key."
+
+An associative memory compares the input with every stored key and returns values in proportion to how similar the input is to each key. An input that resembles a key brings back that key's value even if it is not an exact match, and an input that partly resembles two keys brings back a mixture of their values.
+
+In LoRA, the stored pairs are the rows of \(A\) (keys) and the columns of \(B\) (values), and the comparison is the dot product \(a_k^\top x\). To see this with numbers, imagine a three-dimensional hidden space whose coordinates happen to mean "heart-related," "diabetes-related," and "something else," with keys \(a_1 = (1, 0, 0)\) and \(a_2 = (0, 1, 0)\). Real hidden spaces are not this tidy; the clean axes are only for illustration.
+
+| Input | \(x\) | \(a_1^\top x\) | \(a_2^\top x\) | Correction |
+| --- | --- | --- | --- | --- |
+| A chest-pain question | \((0.9, 0.1, 0.3)\) | \(0.9\) | \(0.1\) | \(0.9\,b_1 + 0.1\,b_2\), mostly the first value |
+| A question on blood sugar after heart surgery | \((0.6, 0.7, 0.2)\) | \(0.6\) | \(0.7\) | \(0.6\,b_1 + 0.7\,b_2\), a mixture |
+| A cooking question | \((0, 0, 1)\) | \(0\) | \(0\) | nothing added |
+
+The chest-pain question was never stored as a key, but it is close to \(a_1\), so it retrieves mostly \(b_1\). That is what "retrieved by content" means.
 
 It is called **local** because the retrieval only matters near the keys. If an input is unrelated to the fine-tuning domain, it tends to be nearly perpendicular to every key, the similarity scores stay small, and the adapter adds little correction. The base model keeps its general behavior, and LoRA acts as a compact, task-specific memory bank on top of it.
 
