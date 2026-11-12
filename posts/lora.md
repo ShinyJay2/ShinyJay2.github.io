@@ -140,6 +140,10 @@ This is not extra machinery; it is the same \(BAx\) read in two steps. The struc
 
 ## Why this is called a local associative memory
 
+**Memory** because \(A\) and \(B\) behave like a store that is written once and read many times. Training *writes* pairs into it: each key \(a_k\) and its value \(b_k\) are stored in the weights and stay fixed afterward. Inference *reads* from it: every input \(x\) acts as a cue, and the layer returns the values whose keys match that cue. Storing information and retrieving it later with a cue is what makes something a memory.
+
+This is also a classic form. A matrix built as a sum of outer products, \(M = \sum_k v_k k_k^\top\), is the textbook **linear associative memory**: multiplying by an input \(x\) returns \(\sum_k v_k (k_k^\top x)\), each stored value weighted by how well \(x\) matches its key. \(BA = \sum_k b_k a_k^\top\) has exactly this form, with \(a_k\) as the keys and \(b_k\) as the values.
+
 **Associative** means retrieval by similarity rather than by exact address. A dictionary lookup fails unless the key matches exactly; here every input is compared with every key, and each value is returned in proportion to its score. An input close to one key retrieves mostly that key's value, and an input between two keys retrieves a mixture.
 
 **Local** means the correction only matters near the keys. An input unrelated to what the adapter was trained on tends to be nearly perpendicular to every key, so every score is small and the layer behaves almost exactly like the frozen base model.
