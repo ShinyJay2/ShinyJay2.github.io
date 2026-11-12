@@ -11,7 +11,7 @@ const tbl=(M,rows,cols,cls)=>`<table><tbody>${[...Array(rows)].map((_,i)=>`<tr>$
 function sumWidget(el){
  el.innerHTML=`<div class="viz-heading"><h3>One entry of BA is a sum of r products</h3></div><p>Choose a rank and a cell of \u0394W = BA. The highlighted row of B and column of A are multiplied pairwise; the number of pairs equals r.</p>
  <div class="viz-controls"><label>Rank r <output></output><input type="range" min="1" max="${RMAX}" value="2" data-r aria-label="Rank r"></label><label>Row i <output></output><input type="range" min="1" max="${D}" value="1" data-i aria-label="Row i"></label><label>Column j <output></output><input type="range" min="1" max="${D}" value="1" data-j aria-label="Column j"></label></div>
- <div class="lora-matrix" aria-live="polite"></div><div class="lora-terms viz-result"></div>`;
+ <div class="lora-matrix" aria-live="polite"></div><div class="lora-terms"></div>`;
  const q=s=>el.querySelector(s);
  const draw=()=>{const r=+q('[data-r]').value,i=+q('[data-i]').value-1,j=+q('[data-j]').value-1;
   el.querySelectorAll('.viz-controls output').forEach((o,n)=>o.textContent=[r,i+1,j+1][n]);
