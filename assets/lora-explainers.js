@@ -39,6 +39,35 @@ function scaleWidget(el){
  el.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',draw));draw();
 }
 
+
+// Block diagram: y = W0 x + B A x (or full fine-tuning y = W0 x + dW x)
+function diagramWidget(el){
+ el.innerHTML=`<div class="viz-heading"><h3>Full fine-tuning versus LoRA</h3></div><p>A toy layer with a 6 \u00d7 6 weight matrix. Each circle is one number. The snowflake marks a frozen matrix; the flame marks a trainable one. Switch the method and change the rank to see which numbers are trained.</p>
+ <div class="viz-controls"><label>Method<select data-m aria-label="Method"><option value="lora">LoRA</option><option value="full">Full fine-tuning</option></select></label><label>Rank r <output></output><input type="range" min="1" max="4" value="2" data-r aria-label="Rank r"></label></div>
+ <div class="viz-plot lora-diagram"></div><div class="viz-result" aria-live="polite"></div>`;
+ const q=s=>el.querySelector(s),D=6,c=22,pad=4;
+ const block=(x,y,cols,rows,col)=>{let g=`<rect x="${x}" y="${y}" width="${cols*c+pad*2}" height="${rows*c+pad*2}" fill="${col}" fill-opacity=".72" stroke="var(--text)" stroke-width="2"/>`;for(let i=0;i<rows;i++)for(let j=0;j<cols;j++)g+=`<circle cx="${x+pad+c*j+c/2}" cy="${y+pad+c*i+c/2}" r="${c*0.32}" fill="none" stroke="#fff" stroke-width="1.8"/>`;return g;};
+ const label=(x,y,t,col,size=26)=>`<text x="${x}" y="${y}" text-anchor="middle" style="fill:${col};font-family:KaTeX_Math,serif;font-style:italic;font-weight:700;font-size:${size}px">${t}</text>`;
+ const icon=(x,y,kind)=>kind==='ice'?`<g transform="translate(${x},${y})" stroke="#58c4dd" stroke-width="2.4" stroke-linecap="round">${[0,60,120].map(a=>`<g transform="rotate(${a})"><line x1="0" y1="-13" x2="0" y2="13"/><line x1="0" y1="-8" x2="-4" y2="-12"/><line x1="0" y1="-8" x2="4" y2="-12"/><line x1="0" y1="8" x2="-4" y2="12"/><line x1="0" y1="8" x2="4" y2="12"/></g>`).join('')}</g>`:`<g transform="translate(${x},${y})"><path d="M0,-15 C7,-6 11,0 9,7 C7,13 -7,13 -9,7 C-11,0 -4,-4 -2,-10 C0,-5 3,-3 3,-3 C3,-8 1,-12 0,-15Z" fill="#ff862f"/><path d="M0,-2 C4,3 5,6 3,9 C1,12 -3,12 -4,9 C-5,6 -2,3 0,-2Z" fill="#f4d345"/></g>`;
+ const draw=()=>{const full=q('[data-m]').value==='full',r=+q('[data-r]').value;q('[data-r]').disabled=full;q('[data-r]').closest('label').style.opacity=full?.4:1;
+  el.querySelector('.viz-controls output').textContent=r;
+  const H=D*c+pad*2,top=48;let x=10,g='';
+  const put=(cols,rows,col,lab,labcol,ic,yOff=0)=>{const w=cols*c+pad*2;g+=block(x,top+yOff,cols,rows,col);if(lab)g+=label(x+w/2,top+H+34,lab,labcol);if(ic)g+=icon(x+w/2,top-22,ic);const cx=x+w/2;x+=w+12;return {cx,w};};
+  const op=(t)=>{g+=`<text x="${x+10}" y="${top+H/2+9}" text-anchor="middle" style="fill:var(--text);font-family:KaTeX_Main,serif;font-size:30px">${t}</text>`;x+=32;};
+  put(1,D,'#7a5a8c','y','var(--m-purple)');op('=');
+  put(D,D,'#2a7a6a','W<tspan font-size="17" dy="6" style="font-family:KaTeX_Main,serif;font-style:normal;font-weight:400">0</tspan>','var(--m-teal)','ice');x-=6;
+  put(1,D,'#2a6f8a','x','var(--accent)');op('+');
+  let dwx0=x;
+  if(full){put(D,D,'#4f8a3a','\u0394W','var(--m-green)','fire');x-=6;}
+  else{const b=put(r,D,'#b4561f','B','var(--m-orange)','fire');x-=4;const a=put(D,r,'#8f7a2a','A','var(--viz-secondary)','fire');x-=6;
+   g+=label((dwx0+x)/2,top+H+70,'<tspan style="fill:var(--m-green)">\u0394W</tspan><tspan style="fill:var(--text);font-style:normal;font-weight:400"> = </tspan><tspan style="fill:var(--m-orange)">B</tspan><tspan style="fill:var(--viz-secondary)">A</tspan>','var(--text)',26);}
+  put(1,D,'#2a6f8a','x','var(--accent)');
+  q('.viz-plot').innerHTML=`<svg viewBox="0 0 ${x} ${top+H+82}" role="img" aria-label="${full?'Full fine-tuning: y equals W0 x plus a full-size delta W times x':'LoRA: y equals W0 x plus B times A times x'}">${g}</svg>`;
+  const toy=full?D*D:2*D*r,big=full?4096*4096:2*4096*r,fmt=n=>n.toLocaleString('en-US');
+  q('.viz-result').innerHTML=full?`Trainable numbers in this toy layer: <strong>${toy}</strong> of 36. The update \u0394W has the same 6 \u00d7 6 shape as W<sub>0</sub>, and every entry is trained.<br>For a 4096 \u00d7 4096 layer: <strong>${fmt(big)}</strong> trainable numbers.`:`Trainable numbers in this toy layer: <strong>${toy}</strong> (B: 6 \u00d7 ${r}, A: ${r} \u00d7 6) instead of 36. W<sub>0</sub> stays frozen.<br>For a 4096 \u00d7 4096 layer with r = ${r}: <strong>${fmt(big)}</strong> trainable numbers, ${(big/(4096*4096)*100).toFixed(2)}% of ${fmt(4096*4096)}.`;};
+ el.querySelectorAll('input,select').forEach(x=>x.addEventListener('input',draw));draw();
+}
+
 // Key-value reading: correction = s1*b1 + s2*b2 with s_k = a_k . x
 const KEYS=[15,105];
 const VALS=[[0.8,0.5,-0.2,0.1],[-0.1,0.3,0.7,0.6]];
@@ -74,5 +103,5 @@ function kvWidget(el){
   q('.viz-result').innerHTML=`Scores: ${hs('a',1,'T')}${hs('x')} = ${f(sc[0])}, ${hs('a',2,'T')}${hs('x')} = ${f(sc[1])}. Size of the correction \u2016\u0394${hs('y')}\u2016 = <strong>${norm.toFixed(2)}</strong>.<br>${rel<0.15?'The input is almost unrelated to both keys, so the adapter adds almost nothing and the layer behaves like the base model.':(()=>{const k=Math.abs(sc[0])>=Math.abs(sc[1])?0:1,o=1-k;if(Math.abs(sc[k])>0.85&&Math.abs(sc[o])<0.3)return sc[k]>0?`${hs('x')} is aligned with ${hs('a',k+1)}, so the correction is mostly ${hs('b',k+1)}.`:`${hs('x')} points opposite ${hs('a',k+1)}, so the score is negative and the correction mostly subtracts ${hs('b',k+1)}.`;return `Both keys respond, so the correction mixes ${hs('b',1)} and ${hs('b',2)}. A negative score subtracts its value.`})()}`;};
  el.querySelectorAll('input').forEach(x=>x.addEventListener('input',draw));draw();
 }
-const widgets={'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
+const widgets={'lora-diagram':diagramWidget,'lora-sum':sumWidget,'lora-scale':scaleWidget,'lora-kv':kvWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));

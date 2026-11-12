@@ -361,3 +361,4 @@ html:not([data-theme=dark]) .rl-cell{background:transparent}
 .viz-plot svg{max-width:560px}
 .explainer em{font-style:italic}
 .viz-legend span.lg{display:inline}
+.lora-diagram svg{max-width:640px}
