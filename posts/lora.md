@@ -2,7 +2,7 @@
 title: "LoRA"
 date: "2026-11-12"
 category: "Language Models"
-description: "Low-rank adaptation from the ground up: what B and A are, what the alpha over r scaling does, and why the update behaves like a local key-value memory."
+description: "LoRA and QLoRA from the ground up: low-rank updates, key-value memory, and interactive explorations of NF4, block-wise scaling, and double quantization."
 draft: false
 ---
 
@@ -28,7 +28,7 @@ y = W_0 x + \Delta W x = W_0 x + BAx
 
 In the [original LoRA paper](https://arxiv.org/abs/2106.09685), \(B\) is initialized to zero, so \(\Delta W = 0\) at the start and training begins exactly from the pretrained model. After training, \(BA\) can be added into \(W_0\), so the adapted layer runs as a single matrix with no extra inference cost. Keeping \(BA\) separate instead allows one frozen base model to be shared by many small task-specific adapters.
 
-The rest of this article goes through the pieces of this update one at a time: the scaling factor applied to it, what the rank \(r\) means, and how the update can be read as a set of keys and values.
+The rest of this article goes through the pieces of this update one at a time: the scaling factor applied to it, what the rank \(r\) means, how the update can be read as a set of keys and values, and how QLoRA compresses the frozen backbone with quantization.
 
 ## What the scaling factor scales
 
@@ -200,6 +200,225 @@ Because \(A\) and \(B\) play different roles, they need not share a learning rat
 
 The reason is a mismatch in scale. \(A\) maps a wide input down to a few dimensions, and \(B\) maps those few dimensions back up to the full output. With a single learning rate, \(B\) tends to be undertrained. Raising \(B\)'s learning rate keeps the two matrices learning at a matched pace, which speeds up fine-tuning and often improves the final result without adding any parameters.
 
-## Source
+<span id="quantization"></span>
 
-These notes are based on [The Tiny Idea That Lets Anyone Fine-Tune AI](https://www.youtube.com/watch?v=U80tjcThl9Q) by Jia-Bin Huang.
+## The memory that LoRA does not remove
+
+LoRA makes the *trainable update* small, but every forward pass still needs \(W_0x\). The frozen weights must remain available even though the optimizer never changes them.
+
+For a 70-billion-parameter model, storing each weight in 16 bits takes approximately 140 GB. Storing each in 4 bits would take 35 GB instead. These are **weight-storage figures, not total training-memory requirements**: scales, adapters, activations, gradients, and optimizer states still need space.
+
+**QLoRA** compresses the frozen backbone while training the small adapters in higher precision. The key distinction is between **storing a weight** and **computing with it**.
+
+## Quantization is a choice of representatives
+
+Suppose a small group of weights contains:
+
+```math
+w = [-0.80,\;-0.31,\;0.12,\;0.49].
+```
+
+We will follow \(0.12\) through each step.
+
+Four bits distinguish only \(2^4=16\) patterns. We choose a small set of **representative values** and store the code for the closest one. Different original values can share a code, losing information.
+
+### First, put the weights on a common scale
+
+Find the largest absolute value in the group:
+
+```math
+c = \max_i |w_i| = 0.80.
+```
+
+Divide each weight by \(c\):
+
+```math
+z_i = \frac{w_i}{c},\qquad
+z = [-1.00,\;-0.3875,\;0.15,\;0.6125].
+```
+
+Every normalized value now lies between \(-1\) and \(1\). This lets different groups of weights reuse the same set of representatives. We must also save \(c\), because the code alone does not tell us the original magnitude. An all-zero group needs no division: it can simply be encoded as zeros.
+
+### Then, snap to a representable value
+
+Start with a simple **symmetric uniform quantizer**. Use the integer codes \(-7,-6,\ldots,0,\ldots,6,7\), corresponding to representatives \(-1,-6/7,\ldots,0,\ldots,6/7,1\).
+
+The gaps are all \(1/7\). Encoding and decoding are:
+
+```math
+q = \operatorname{round}\!\left(7\frac{w}{c}\right),
+\qquad
+\hat w = c\frac{q}{7}.
+```
+
+For our selected weight:
+
+```math
+w=0.12,\qquad z=0.12/0.80=0.15,\qquad
+q=\operatorname{round}(1.05)=1.
+```
+
+We store the code \(1\). When we need the weight again, we decode it:
+
+```math
+\hat w=0.80\times\frac17\approx0.114286.
+```
+
+**Dequantization returns a representative, not the lost original.** Writing \(0.114286\) in a higher-precision format does not turn it back into \(0.12\). The absolute error here is about \(0.005714\).
+
+<div class="explainer quantization" data-quantization="steps"></div>
+
+*Move the weight slowly.* The reconstruction stays still and then jumps: each plateau shares one code. The scale stays fixed at 0.80, as if another weight supplies the block maximum.
+
+### Why use only 15 of the 16 codes?
+
+This particular uniform quantizer wants an exact zero and matching positive and negative representatives. A symmetric set containing zero has an odd number of elements: seven negative values, zero, and seven positive values make 15. A signed four-bit integer can also represent \(-8\), but we leave that code unused here.
+
+This is a design choice for this introductory quantizer, **not a rule that every four-bit format must waste a code**. NF4 makes a different tradeoff.
+
+## NF4: spend precision where the weights are
+
+Pretrained weights often cluster near zero, with fewer values in the tails. A zero-centered normal distribution is a useful approximation, though not exact for every layer.
+
+**4-bit NormalFloat (NF4)** puts more representatives near zero and fewer near the extremes. Its fixed, nonuniform codebook uses quantiles of a normal distribution to allocate the 16 available codes.
+
+A quantile divides probability mass, not distance: a narrow interval near zero can contain as much probability as a wide interval in a tail. This motivates denser representatives near zero, but does not guarantee equal code usage or optimal error for every real block.
+
+### The bits are an index into a codebook
+
+For NF4, the stored four-bit pattern is best read as a lookup index. It is not an ordinary signed integer to multiply directly by a scale:
+
+```math
+q = \underset{j\in\{0,\ldots,15\}}{\operatorname{argmin}}
+\left|\frac{w}{c}-v_j\right|,
+\qquad
+\hat w = c\,v_q.
+```
+
+Here \(v_j\) is representative \(j\) in the shared NF4 codebook. The codebook is fixed and reused; it is not stored separately for every weight or block.
+
+Our normalized value \(0.15\) is closest to the representative \(0.160930\). With zero-based indexing in ascending order, that is code 9, or the four bits `1001`:
+
+```math
+0.12/0.80=0.15
+\quad\longrightarrow\quad
+q=9
+\quad\longrightarrow\quad
+\hat w=0.80\times0.160930\approx0.128744.
+```
+
+For **this weight**, NF4 has a slightly larger error than uniform quantization. It allocates precision for a distribution, not to win at every individual point.
+
+<div class="explainer quantization" data-quantization="nf4"></div>
+
+*Compare the spaces between the marks, then move the selected value.* NF4 uses smaller gaps near zero and larger gaps in the tails.
+
+### Exact zero without discarding a code
+
+NF4 uses all 16 codes while retaining an exact zero. It gives up perfect positive-negative symmetry: there are seven negative representatives, one zero, and eight positive representatives. Equivalently, construct eight values from the negative side through zero and nine from zero through the positive side, then remove the duplicate zero.
+
+NF4 is a specialized set of reconstruction values, not an integer grid or a conventional sign-exponent-mantissa format.
+
+## One outlier should not set everybody's scale
+
+A better codebook does not solve a bad choice of scale. Suppose most weights are small, but one is \(4.17\). If we use a single maximum for the whole matrix, then \(c=4.17\), and our familiar weight becomes:
+
+```math
+0.12/4.17\approx0.028777.
+```
+
+This lies closer to NF4's zero than to its smallest positive representative, approximately \(0.079580\). The weight therefore reconstructs as zero. The actual weight was not zero; **the outlier made the common scale too coarse to distinguish it**.
+
+### Give each block its own scale
+
+Block-wise quantization partitions the weights into small groups, commonly 64 weights per block in QLoRA. Each group gets its own maximum absolute value:
+
+```math
+c_b = \max_{i\in b}|w_i|,
+\qquad
+\hat w_i = c_b\,v_{q_i}.
+```
+
+The outlier still affects its own block, but no longer dictates the scale of every other block. If our \(0.12\) weight belongs to a different block whose maximum is \(0.80\), we recover the previous normalization, \(0.15\), and the NF4 reconstruction, approximately \(0.128744\).
+
+<div class="explainer quantization" data-quantization="blocks"></div>
+
+*Increase the outlier, then change the block size.* The first four entries reuse our example, with 0.12 first. Blocks group weights by position, not similarity. The reported average excludes the outlier to show its effect on the other weights.
+
+Smaller blocks often preserve local resolution better, but they also require more scales. This is a tradeoff, not a guarantee that every weight's error decreases whenever the block size shrinks.
+
+**NF4 chooses where the representatives go. Block-wise scaling chooses how much of the original number line those representatives cover.** They solve different parts of the problem.
+
+## Double quantization: compress the scales as well
+
+So far, each block has four-bit weight codes and a higher-precision scale. If a block contains 64 weights and its scale occupies 32 bits, the scale adds:
+
+```math
+\frac{32}{64}=0.5\text{ bits per weight}.
+```
+
+The total is therefore 4.5 bits per weight, not 4. That extra half-bit is small for one block but substantial across billions of parameters.
+
+**Double quantization** treats the collection of scales as another tensor to compress. The first quantization compresses the weights. The second compresses their scales. It does not mean repeatedly rounding the same weight twice.
+
+In the QLoRA paper, the scales are centered by subtracting their mean and then quantized to eight bits. Groups of 256 of those scale values share a second-level 32-bit scale. Decoding first reconstructs a first-level scale \(\hat c_b\), then uses it to reconstruct the weights:
+
+```math
+\hat w_i=\hat c_b\,v_{q_i}.
+```
+
+Ignoring the small global mean and other bookkeeping, the scale overhead per original weight becomes:
+
+```math
+\frac{8}{64}+\frac{32}{64\times256}
+=0.126953125\text{ bits}.
+```
+
+The first term pays for an eight-bit code per block. The second pays for a 32-bit second-level scale shared across 256 blocks. Including the four-bit weight codes gives approximately **4.127 bits per weight**, rather than 4.5.
+
+<div class="explainer quantization" data-quantization="memory"></div>
+
+The chart assumes all weights use the selected format; actual models may retain some tensors at higher precision. Scale metadata is magnified separately to make its savings visible.
+
+A reconstructed scale is itself an approximation. If its error is \(\delta c_b\), the additional error for a weight using representative \(v_q\) is \(\delta c_b v_q\). Double quantization trades a small amount of additional numerical error for a smaller memory footprint.
+
+## Stored in four bits, computed in higher precision
+
+We can now return to the layer's forward pass. Let \(\hat W_0\) denote the approximate weights decoded from the frozen codes and scales:
+
+```math
+y=\hat W_0x+\frac{\alpha}{r}BAx.
+```
+
+The input \(x\) is the numeric representation arriving at this layer, after the user query has been tokenized and processed by earlier computations. It follows two paths:
+
+1. **Frozen path.** Read the compressed weight codes and scales, reconstruct the needed weights in a computation format such as BF16, and calculate \(\hat W_0x\).
+2. **Trainable path.** Calculate the LoRA correction \((\alpha/r)BAx\) using higher-precision adapter weights.
+3. **Combine.** Add the two outputs, compute the training loss, and backpropagate to update \(A\) and \(B\).
+
+The base codes and scales stay fixed, but the frozen path still propagates gradients to earlier trainable components. “Frozen” means its weights are not updated.
+
+Weights can be dequantized as needed, without keeping a full high-precision model resident. The amount materialized at once depends on the implementation.
+
+**Higher-precision arithmetic does not undo quantization error.** Adapters can accommodate some errors while learning the task, but need not reconstruct the original model exactly.
+
+## What QLoRA saves, and what it does not
+
+The three quantization ideas work together:
+
+- **NF4** uses the four-bit budget more effectively for approximately normally distributed weights.
+- **Block-wise scaling** limits how far an outlier can damage resolution.
+- **Double quantization** reduces the cost of storing all those local scales.
+
+LoRA then avoids training the enormous base matrix. It saves the gradients and optimizer states that updating that matrix would otherwise require.
+
+Activations, adapter gradients, optimizer states for the adapters, temporary buffers, and any tensors left unquantized still consume memory. The original QLoRA paper also introduces **paged optimizers** to manage memory spikes by moving optimizer memory between GPU and CPU when needed. That is a separate mechanism from quantization.
+
+The paper demonstrates fine-tuning a **65B model on a single 48 GB GPU**. The video's 70B example is useful for storage arithmetic, but neither number is a universal fit guarantee: sequence length, batch size, adapter configuration, checkpointing, and implementation matter.
+
+The central idea is not to make every operation four-bit. It is to **store the large, fixed part cheaply, compute with its reconstructed values, and spend trainable precision on the small part that needs to change**.
+
+## Sources
+
+- [The Tiny Idea That Lets Anyone Fine-Tune AI](https://www.youtube.com/watch?v=U80tjcThl9Q), Jia-Bin Huang.
+- [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314), Dettmers et al.
