@@ -110,3 +110,41 @@ function proxyWidget(el){
 
 const widgets={'dev-url':urlWidget,'dev-layers':layersWidget,'dev-tcp':tcpWidget,'dev-proxy':proxyWidget};
 document.querySelectorAll('.explainer[data-explainer]').forEach(el=>widgets[el.dataset.explainer]?.(el));
+
+// Static diagrams (no controls). Drawn as SVG so colors follow the light and dark themes.
+const D={
+ box:(x,y,w,h,title,sub,cls='')=>`<g class="dg-box ${cls}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/><text class="t" x="${x+w/2}" y="${y+(sub?h/2-3:h/2+5)}" text-anchor="middle">${esc(title)}</text>${sub?`<text class="s" x="${x+w/2}" y="${y+h/2+14}" text-anchor="middle">${esc(sub)}</text>`:''}</g>`,
+ arrow:(x1,y1,x2,y2,label,lx,ly)=>`<line class="dg-arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#dg-head)"/>${label?`<text class="dg-label" x="${lx??(x1+x2)/2}" y="${ly??((y1+y2)/2-7)}" text-anchor="middle">${esc(label)}</text>`:''}`,
+ zone:(x,y,w,h,label)=>`<g class="dg-zone"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/><text x="${x+12}" y="${y+20}">${esc(label)}</text></g>`,
+ svg:(w,h,body,label)=>`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)}"><defs><marker id="dg-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="dg-head"/></marker></defs>${body}</svg>`};
+const diagrams={
+ packet(){const L=[['ip','IP header','src 192.168.0.5 → dst 203.0.113.10','which computer'],['tcp','TCP header','src port 52341 → dst port 443, seq 1001','which program, which byte'],['tls','TLS record','encrypted with the session key','unreadable in transit'],['http','HTTP message','GET /posts/3 HTTP/1.1  Host: shop.com','what the application reads']];
+  let g='';L.forEach(([k,t,s,why],i)=>{const x=10+i*22,y=10+i*58,w=460-i*44,h=250-i*58;g+=`<g class="dg-layer ${k}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10"/><text class="t" x="${x+14}" y="${y+22}">${t}</text><text class="s" x="${x+14}" y="${y+40}">${esc(s)}</text><text class="why" x="${x+w-14}" y="${y+22}" text-anchor="end">${why}</text></g>`});
+  return D.svg(480,270,g,'Nested packet: IP header wraps TCP header, which wraps a TLS record containing the HTTP message');},
+ flow(){const S=[['1','DNS lookup','naver.com → 223.130.200.104'],['2','TCP handshake','SYN, SYN+ACK, ACK on port 443'],['3','TLS handshake','check certificate, agree on session key'],['4','HTTP request and response','encrypted with the session key']];
+  let g='';S.forEach(([n,t,s],i)=>{const y=8+i*70;g+=`<circle class="dg-step" cx="30" cy="${y+26}" r="15"/><text class="dg-stepn" x="30" y="${y+31}" text-anchor="middle">${n}</text>`+D.box(60,y,400,52,t,s);if(i<3)g+=D.arrow(30,y+43,30,y+79)});
+  return D.svg(470,280,g,'Four stages: DNS lookup, TCP handshake, TLS handshake, encrypted HTTP');},
+ nginx(){let g=D.zone(150,8,326,256,'server machine shop.com');
+  g+=D.box(10,104,110,52,'Internet','user requests');
+  g+=D.box(168,30,128,52,'Operating system','reads TCP port','os');
+  g+=D.box(168,170,128,52,'nginx','listens on 443','hl');
+  g+=D.box(350,120,116,52,'Spring app','listens on 8080');
+  g+=D.box(350,200,116,52,'Files on disk','/images/...');
+  g+=D.arrow(120,124,168,64,'port 443',128,82)+D.arrow(232,82,232,168);
+  g+=`<text class="dg-label" x="240" y="118">hands data to the</text><text class="dg-label" x="240" y="132">program on 443</text>`;
+  g+=D.arrow(296,186,348,148,'/api/...',318,158)+D.arrow(296,208,348,226,'/images/...',318,236);
+  return D.svg(480,272,g,'Internet traffic on port 443 goes through the operating system to nginx, which routes /api to Spring on 8080 and /images to files');},
+ forward(){let g=D.zone(6,8,250,232,'company network');
+  [0,1,2].forEach(i=>{g+=D.box(20,36+i*66,100,48,'Employee PC',`10.0.0.${5+i}`);g+=D.arrow(120,60+i*66,158,112+i*16)});
+  g+=D.box(160,100,86,56,'Forward','proxy','hl');
+  g+=D.arrow(246,120,316,88)+D.arrow(246,136,316,168);
+  g+=D.box(318,64,152,48,'shop.com','internet server')+D.box(318,144,152,48,'news.com','internet server');
+  g+=`<text class="dg-note" x="130" y="232" text-anchor="middle">hidden: which employee asked</text><text class="dg-note" x="394" y="218" text-anchor="middle">both see requests from</text><text class="dg-note" x="394" y="233" text-anchor="middle">198.51.100.7 (the proxy)</text>`;
+  return D.svg(480,248,g,'Forward proxy: employee PCs inside the company network send requests through the proxy, so internet servers see only the proxy address');},
+ reverse(){let g=D.zone(224,8,250,232,'shop.com servers');
+  [0,1,2].forEach(i=>{g+=D.box(8,36+i*66,104,48,'User',`browser ${i+1}`);g+=D.arrow(112,60+i*66,236,112+i*16)});
+  g+=D.box(238,100,86,56,'nginx','reverse proxy','hl');
+  [0,1,2].forEach(i=>{g+=D.arrow(324,112+i*16,358,60+i*66);g+=D.box(360,36+i*66,104,48,'Spring',`:${8080+i}`)});
+  g+=`<text class="dg-label" x="174" y="40" text-anchor="middle">all connect to</text><text class="dg-label" x="174" y="54" text-anchor="middle">shop.com:443</text><text class="dg-note" x="112" y="232" text-anchor="middle">users see only shop.com</text><text class="dg-note" x="412" y="232" text-anchor="middle">hidden: servers and ports</text>`;
+  return D.svg(480,248,g,'Reverse proxy: users connect to nginx at shop.com:443, which forwards to several hidden Spring servers');}};
+document.querySelectorAll('[data-diagram]').forEach(el=>{const f=diagrams[el.dataset.diagram];if(f)el.innerHTML=f()});

@@ -8,125 +8,42 @@ description: "What a backend does, the anatomy of HTTP requests and URLs, DNS an
 draft: false
 ---
 
-## What a backend does
+## HTTP in brief
 
-Every web or app interaction has three parts.
-
-- The **client** is the program the user touches: a browser or a mobile app. It sends requests and draws the results on screen. The screen-drawing part is the **frontend**.
-- The **server** receives those requests, applies the rules of the service, and returns a response. This is the **backend**.
-- The **database (DB)** stores the data the server needs.
-
-Opening a social media feed, for example, works like this:
-
-1. The app sends a **request** to the server: "show this user's feed".
-2. The server checks whether the user is logged in and whom they follow, then reads the relevant posts from the database.
-3. The server packages the result and returns it as a **response**.
-4. The app renders the data on screen.
-
-A backend developer's work therefore falls into three parts: receive requests, apply the rules (authentication, calculations, permissions), and store or read data to build a response. The format the client and server agree on for those requests and responses is HTTP.
-
-## HTTP requests and responses
-
-HTTP messages are plain text with a fixed layout.
-
-### The request
+A **client** (browser or app) sends a **request**; the **server**, the backend, applies the service's rules, reads or writes the **database**, and returns a **response**. The agreed format for both is HTTP, which is plain text:
 
 ```
-GET /posts/3 HTTP/1.1
-Host: myblog.com
-Accept: application/json
-```
-
-- The first line holds the **method** (what to do), the **path** (on what), and the HTTP version.
-- The lines below are **headers**: additional information, such as "respond in JSON".
-- An optional **body** follows a blank line and carries data, such as the text of a new post.
-
-### Methods
-
-| Method | Meaning | Example |
-|---|---|---|
-| GET | Read | Show post 3 |
-| POST | Create | Write a new post |
-| PUT / PATCH | Update | Edit post 3 |
-| DELETE | Delete | Delete post 3 |
-
-Creating a post therefore looks like this:
-
-```
-POST /posts HTTP/1.1
-Host: myblog.com
+POST /posts HTTP/1.1                         ← method, path, version
+Host: myblog.com                             ← headers
 Content-Type: application/json
 
-{"title": "First post", "content": "Hello"}
+{"title": "First post", "content": "Hello"}  ← body (JSON)
 ```
 
-Everything below the blank line is the body. The `{ }` format is **JSON**, the most common format for data exchanged by backends.
-
-### The response
-
 ```
-HTTP/1.1 200 OK
+HTTP/1.1 201 Created                         ← status code
 Content-Type: application/json
 
 {"id": 3, "title": "First post", "content": "Hello"}
 ```
 
-The number on the first line is the **status code**, the server's summary of what happened.
+The **method** says what to do: GET reads, POST creates, PUT and PATCH update, DELETE deletes. The **status code** summarizes the result: 2xx success, 4xx a client mistake (400 malformed, 401 not logged in, 404 not found), 5xx a server mistake (500).
 
-- **2xx, success**: 200 OK, 201 Created.
-- **4xx, the client's mistake**: 400 malformed request, 401 log in first, 404 no such resource.
-- **5xx, the server's mistake**: 500 internal server error.
-
-In Spring, a backend developer writes rules of the form: "when `GET /posts/3` arrives, read post 3 from the database and return it as JSON with status 200."
-
-The browser's developer tools show these messages directly: press F12 (Cmd+Option+I on macOS), open the **Network** tab, reload the page, and select any row to see its **Request Method** and **Status Code**.
-
-### Deleting the same thing twice
-
-Deleting a comment sends a `DELETE` request. If the comment has already been deleted, a second `DELETE` commonly returns **404 Not Found**, because the resource no longer exists. Some services instead return **204 No Content**, reasoning that the desired end state (the comment is gone) already holds. Both conventions are used; choosing between them is an API design decision made by the backend developer.
+Deleting a comment that has already been deleted commonly returns **404 Not Found**. Some APIs return **204 No Content** instead, since the desired end state already holds. Which one to return is an API design decision made by the backend developer.
 
 ## URLs, DNS, IP addresses, and ports
 
-An HTTP message needs a destination. Four concepts determine where it goes.
+A URL such as `https://www.naver.com:443/news/list?page=2` has five parts: the **protocol** (`https`), the **host** (`www.naver.com`), the **port** (`:443`, usually omitted), the **path** (`/news/list`), and the **query string** (`?page=2`).
 
-### The parts of a URL
+Three points are easy to get wrong:
 
-```
-https://www.naver.com:443/news/list?page=2
-```
-
-- `https` is the **protocol**: the rules of the conversation. HTTPS is the encrypted form of HTTP.
-- `www.naver.com` is the **host**, written as a domain name.
-- `:443` is the **port**, usually omitted.
-- `/news/list` is the **path**: which resource on that host.
-- `?page=2` is the **query string**: additional options.
-
-Two points are easy to confuse. First, in `http://localhost:8080/posts/3`, `localhost` is the **host**, not the path; it means "this computer itself". The path begins at the first `/` after the host, so it is `/posts/3`, written with the leading slash. Second, when the port is omitted the browser uses the protocol's default: **80 for http and 443 for https**.
-
-Typing an address into the browser's address bar and pressing Enter always sends a **GET** request. The address bar can only ask to read. POST is sent when a page or app submits data, for example a sign-up form or a "publish" button. Testing a POST API therefore requires a tool such as Postman or curl rather than the address bar.
+- In `http://localhost:8080/posts/3`, `localhost` is the **host**, not the path; it means "this computer itself". The path begins at the first `/` after the host, so it is `/posts/3`, leading slash included.
+- When the port is omitted, the browser uses the protocol's default: **80 for http, 443 for https**.
+- Typing an address into the address bar always sends **GET**. The address bar can only ask to read. POST comes from a page or app submitting data, such as a sign-up form, which is why POST APIs are tested with tools like Postman or curl.
 
 <div class="explainer" data-explainer="dev-url"></div>
 
-### IP addresses
-
-Computers do not locate each other by names such as `www.naver.com`. They use numeric **IP addresses** such as `223.130.200.104`, the actual network address of a machine.
-
-### DNS
-
-Something must translate names into addresses. That is **DNS** (Domain Name System), effectively the internet's phone book:
-
-> Browser: "What is the address of naver.com?"  DNS: "223.130.200.104."
-
-DNS only translates. A client that already knows the IP address can connect without DNS, so the site remains reachable by IP even when DNS fails. (Large sites sometimes refuse direct IP access for security and certificate reasons, but the principle holds.)
-
-### Ports
-
-One server machine can run several programs. The IP address identifies the machine; the **port** identifies the program on it.
-
-- 80: HTTP
-- 443: HTTPS
-- 3306: MySQL
-- 8080: the default port of a Spring Boot application. During development the address `localhost:8080` appears constantly.
+Computers find each other by numeric **IP addresses** such as `223.130.200.104`, not by names. **DNS** translates a name into an IP address, like a phone book. Because DNS only translates, a client that already knows the IP address can connect even when DNS fails (some large sites refuse direct IP access for security reasons, but the principle holds). The IP address identifies the machine; the **port** identifies the program on it: 80 for HTTP, 443 for HTTPS, 3306 for MySQL, and 8080 for a Spring Boot application by default.
 
 ### Is there one IP address per server?
 
@@ -157,17 +74,9 @@ Following a request for `https://shop.com/posts/3`:
 3. **TCP** adds a header with the source port, the destination port (443), and a sequence number.
 4. **IP** adds a header with the source and destination IP addresses.
 
-The packet that leaves the machine is nested:
+The packet that leaves the machine is nested like this:
 
-```
-┌ IP header (which computer) ──────────────────────┐
-│ ┌ TCP header (which program, which byte) ──────┐ │
-│ │ ┌ TLS (encrypted) ────────────────────────┐ │ │
-│ │ │  GET /posts/3 HTTP/1.1  Host: shop.com  │ │ │
-│ │ └─────────────────────────────────────────┘ │ │
-│ └──────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────┘
-```
+<figure class="dev-diagram"><div data-diagram="packet"></div><figcaption>The packet that leaves the machine. Each layer wraps the one inside it: IP decides which computer, TCP which program and which byte, TLS keeps the HTTP message unreadable in transit.</figcaption></figure>
 
 **Routers** along the way read only the outermost IP header and forward the packet toward the destination address. They do not open the inner layers, and because of TLS they could not read them anyway.
 
@@ -182,11 +91,7 @@ The response travels the same way in the opposite direction.
 
 <div class="explainer" data-explainer="dev-layers"></div>
 
-### Why layers
-
-Because each layer reads only its own header, layers do not need to know about each other. HTTP does not care whether the bytes travel over Wi-Fi or LTE; IP does not care whether the payload is a web page or game data. TCP can be swapped for UDP, or HTTP for another protocol, without changing the other layers.
-
-Spring operates at the HTTP layer. The operating system and the web server software (for example Tomcat) handle TCP, TLS, and IP, and application code receives an already unwrapped `GET /posts/3`. The lower layers still matter for diagnosing slow connections, certificate errors, and similar problems.
+Because each layer reads only its own header, the layers are independent: HTTP does not care whether bytes travel over Wi-Fi or LTE, and IP does not care what the payload is. Spring works only at the HTTP layer; the operating system and the web server software handle TCP, TLS, and IP, so application code receives an already unwrapped `GET /posts/3`.
 
 ## TCP
 
@@ -300,12 +205,7 @@ An observer on a café Wi-Fi network can therefore tell that a device is connect
 
 ### The full sequence
 
-```
-1. DNS lookup: naver.com → IP address
-2. TCP three-way handshake with port 443 at that address
-3. TLS handshake: certificate check and session key agreement
-4. Encrypted HTTP request and response
-```
+<figure class="dev-diagram"><div data-diagram="flow"></div><figcaption>The four stages before and during an HTTPS request.</figcaption></figure>
 
 On macOS or Linux, `curl -v https://www.google.com` prints each stage: `Connected to ...` (TCP connection), the TLS handshake and `Server certificate` details, `> GET / HTTP/2` (the request), and `< HTTP/2 200` (the response).
 
@@ -326,12 +226,7 @@ A packet for port 3306 therefore goes straight from the operating system to MySQ
 
 nginx is itself **just another program, listening on port 443**. What distinguishes it is that it reads the HTTP request and **forwards it to another program**. This role is called a **reverse proxy**, comparable to a reception desk: visitors enter through one main door, and the desk sends each one to the right department.
 
-```
-Internet ──443──▶ [OS] ──▶ nginx
-                            │ reads the HTTP request
-                            ├─ /api/...    ──▶ Spring app (localhost:8080)
-                            └─ /images/... ──▶ image files on disk
-```
+<figure class="dev-diagram"><div data-diagram="nginx"></div><figcaption>The operating system picks nginx by port 443; nginx then picks a backend by reading the HTTP path.</figcaption></figure>
 
 nginx decides using the **HTTP content** (path, `Host` header), not the port. It commonly handles TLS as well, so the Spring application behind it receives plain HTTP.
 
@@ -357,22 +252,15 @@ nginx does not let the original request pass through. It becomes a client itself
 
 ### Forward proxy: acting for clients
 
-```
-[Employee PC] ──▶ [Forward proxy] ──▶ any server on the internet
-                  (company network exit)
-```
+<figure class="dev-diagram"><div data-diagram="forward"></div><figcaption>A forward proxy acts for clients. Internet servers see only the proxy's address, so the individual clients are hidden.</figcaption></figure>
 
 - It sits on the **client side**, for example at a company or school network exit, and all outbound requests go through it.
 - Servers see requests arriving from the **proxy's IP address**. **The client is hidden.**
 - Uses: blocking sites, logging access, caching frequently downloaded files.
-- The word "proxy" on its own usually refers to this kind; it is the original concept.
 
 ### Reverse proxy: acting for servers
 
-```
-Users on the internet ──▶ [Reverse proxy (nginx)] ──▶ Spring servers
-                          (service entrance)
-```
+<figure class="dev-diagram"><div data-diagram="reverse"></div><figcaption>A reverse proxy acts for servers. Users see only shop.com:443, so the servers behind nginx are hidden.</figcaption></figure>
 
 - It sits on the **server side**. Users see only nginx and cannot tell how many Spring servers exist or on which ports. **The servers are hidden.**
 - Its direction is the **reverse** of a forward proxy: it receives requests on behalf of servers rather than sending them on behalf of clients.
@@ -389,6 +277,6 @@ Users on the internet ──▶ [Reverse proxy (nginx)] ──▶ Spring servers
 | Hidden side | Clients | Servers |
 | Example | Company proxy | nginx, AWS ALB |
 
-In one sentence: a forward proxy **sends requests on behalf of clients** and hides the clients; a reverse proxy **receives requests on behalf of servers** and hides the servers. Both perform the same mechanical action of receiving a request and re-issuing it. The difference is who deploys the proxy and whom it serves: a company placing it at its employees' exit makes it a forward proxy; a service operator placing it in front of its own servers makes it a reverse proxy.
+In one sentence: a forward proxy **sends requests on behalf of clients** and hides the clients; a reverse proxy **receives requests on behalf of servers** and hides the servers. The mechanical action is identical; what differs is who deploys the proxy and whom it serves.
 
 <div class="explainer" data-explainer="dev-proxy"></div>

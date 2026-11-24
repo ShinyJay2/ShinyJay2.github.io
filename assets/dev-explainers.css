@@ -19,3 +19,13 @@
 .dev-proxy svg{max-width:460px}
 .explainer .viz-result .viz-table{margin:12px 0 0}.explainer .viz-result .viz-table th{text-align:left;white-space:nowrap;padding-right:12px;font-weight:500;vertical-align:top}
 @media(max-width:600px){.dev-stage{grid-template-columns:1fr 1fr}.dev-mid{grid-column:1/-1;grid-row:2}}
+.article figure.dev-diagram{margin:36px 0 44px}
+.dev-diagram [data-diagram] svg{display:block;width:100%;max-width:560px;margin:auto;font-family:var(--ui,Roboto,Arial,sans-serif)}
+.dev-diagram .dg-box rect{fill:var(--bg);stroke:var(--muted);stroke-width:1.2}.dev-diagram .dg-box.hl rect{stroke:var(--accent);stroke-width:2.2}.dev-diagram .dg-box.os rect{stroke:var(--viz-secondary,#0f8a7e);stroke-width:1.8}
+.dev-diagram .t{fill:var(--text);font-size:13.5px;font-weight:600}.dev-diagram .s{fill:var(--muted);font-size:11.5px}
+.dev-diagram .dg-arrow{stroke:var(--muted);stroke-width:1.6}.dev-diagram .dg-head{fill:var(--muted)}
+.dev-diagram .dg-label{fill:var(--text);font-size:11.5px}.dev-diagram .dg-note{fill:var(--accent);font-size:11.5px;font-weight:500}
+.dev-diagram .dg-zone rect{fill:var(--code);stroke:var(--line);stroke-dasharray:6 5}.dev-diagram .dg-zone text{fill:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.dev-diagram .dg-step{fill:var(--accent)}.dev-diagram .dg-stepn{fill:var(--bg);font-size:13px;font-weight:700}
+.dev-diagram .dg-layer rect{fill:var(--bg);stroke-width:2}.dev-diagram .dg-layer .why{fill:var(--muted);font-size:11px;font-style:italic}
+.dev-diagram .dg-layer.ip rect{stroke:var(--m-orange,#d9822b)}.dev-diagram .dg-layer.tcp rect{stroke:var(--viz-secondary,#0f8a7e)}.dev-diagram .dg-layer.tls rect{stroke:var(--m-green,#3c8d40)}.dev-diagram .dg-layer.http rect{stroke:var(--accent);fill:var(--code)}
