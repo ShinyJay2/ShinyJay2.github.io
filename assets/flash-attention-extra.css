@@ -1,0 +1,32 @@
+.fax-widget .fax-controls { display:flex; flex-direction:column; align-items:stretch; gap:10px; margin-top:14px; padding:11px clamp(8px,3vw,24px); background:var(--panel); border-block:1px solid var(--line); }
+.fax-widget .fax-choices { display:flex; flex-wrap:wrap; gap:6px; }
+.fax-widget .fax-control { appearance:none; margin:0; padding:7px 11px; min-height:34px; font:500 13px/1.25 var(--ui,system-ui,sans-serif); border:1px solid var(--line); border-radius:5px; color:var(--text); background:var(--bg); cursor:pointer; }
+.fax-widget .fax-control:not(:disabled):hover,.fax-widget .fax-control[aria-pressed=true] { border-color:var(--accent); }
+.fax-widget .fax-control[aria-pressed=true] { color:var(--accent); background:color-mix(in srgb,var(--accent) 8%,var(--bg)); }
+.fax-widget .fax-control:disabled { opacity:.45; cursor:default; }
+.fax-widget .fax-control:focus-visible,.fax-widget .fax-range:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.fax-widget .fax-steps { display:grid; grid-template-columns:auto auto minmax(32px,1fr) auto; align-items:center; gap:10px; }
+.fax-widget .fax-progress { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.fax-widget .fax-range { display:block; width:100%; min-width:0; margin:0; height:28px; cursor:pointer; accent-color:var(--accent); }
+.fax-widget .fax-scene { padding:6px clamp(0px,1vw,8px); }
+.fax-widget .fax-scene svg { display:block; width:100%; height:auto; max-width:660px; margin:0 auto; background:none; }
+.fax-widget svg text { font:500 14px var(--ui,system-ui,sans-serif); fill:var(--text); }
+.fax-widget svg .fax-title { font-size:16px; font-weight:650; }
+.fax-widget svg .fax-small { font-size:12px; fill:var(--muted); }
+.fax-widget svg .fax-math { font:500 20px var(--m-serif,Georgia,serif); }
+.fax-widget svg .fax-numeric { font-variant-numeric:tabular-nums; font-weight:650; }
+.fax-widget .fax-panel { fill:var(--panel); stroke:var(--line); }
+.fax-widget .fax-active { fill:color-mix(in srgb,var(--accent) 6%,var(--bg)); stroke:var(--accent); stroke-width:1.5; }
+.fax-widget .fax-outline,.fax-widget .fax-arrow,.fax-widget .fax-axis,.fax-widget .fax-vinculum { fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.fax-widget .fax-arrow { stroke:var(--muted); stroke-width:1.4; }
+.fax-widget .fax-flow .fax-arrow { stroke:var(--accent); stroke-width:2; }
+.fax-widget .fax-axis { stroke:var(--line); stroke-width:1.1; }
+.fax-widget .fax-vinculum { stroke:var(--text); stroke-width:1.5; }
+.fax-widget .fax-outline { stroke:currentColor; stroke-width:1.4; }
+.fax-widget .fax-tile { color:var(--accent); fill:currentColor; }
+.fax-widget .fax-result-tile { color:var(--viz-secondary); }
+.fax-widget .fax-bar { fill:var(--muted); }
+.fax-widget .fax-bar-alt { fill:var(--viz-secondary); }
+.fax-widget .fax-bar-fa { fill:var(--accent); }
+@media(max-width:480px) { .fax-widget .fax-steps { gap:6px; } .fax-widget .fax-control { padding-inline:8px; } }
+@media(prefers-reduced-motion:no-preference) { .fax-widget .fax-enter { animation:fax-enter .24s ease-out; } @keyframes fax-enter { from { opacity:.45; } to { opacity:1; } } }

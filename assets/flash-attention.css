@@ -1,0 +1,38 @@
+/* The page shell provides the figure border, heading and caption styles. */
+.fa-widget { --fa-q: var(--accent); --fa-k: var(--text); --fa-v: var(--viz-secondary); --fa-s: var(--accent); }
+.fa-widget .fa-tools { display: grid; gap: 11px; margin-top: 16px; padding: 12px 24px; border-block: 1px solid var(--line); background: var(--panel,var(--code)); }
+.fa-widget .fa-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.fa-widget .fa-tools button { font: 500 13px/1.2 var(--ui,system-ui,sans-serif); color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 7px 11px; min-height: 34px; cursor: pointer; }
+.fa-widget .fa-tools button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb,var(--accent) 7%,var(--bg)); }
+.fa-widget .fa-tools button:hover:not(:disabled) { border-color: var(--accent); }
+.fa-widget .fa-tools button:disabled { cursor: default; opacity: .48; }
+.fa-widget .fa-tools :is(button,input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fa-widget .fa-steps { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+.fa-widget .fa-steps label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.fa-widget .fa-steps input { width: 100%; min-width: 0; margin: 0; height: 26px; accent-color: var(--accent); cursor: pointer; }
+.fa-widget .fa-scene { padding: 8px clamp(5px,2vw,24px); }
+.fa-widget .fa-scene svg { display: block; width: 100%; height: auto; max-width: 700px; margin: 0 auto; overflow: visible; background: none; }
+.fa-widget svg text { fill: var(--text); font: 500 14px var(--ui,system-ui,sans-serif); }
+.fa-widget svg .fa-heading { font-size: 16px; font-weight: 650; }
+.fa-widget svg .fa-small,.fa-widget svg .fa-ghost { font-size: 12px; fill: var(--muted); }
+.fa-widget svg .fa-number { font: 500 13px var(--mono,ui-monospace,monospace); white-space: pre; }
+.fa-widget .fa-zone,.fa-widget .fa-inset,.fa-widget .fa-active { fill: var(--bg); stroke: var(--line); stroke-width: 1.3; }
+.fa-widget .fa-inset { fill: var(--panel,var(--code)); }
+.fa-widget .fa-active { stroke: var(--accent); stroke-width: 2; fill: color-mix(in srgb,var(--accent) 8%,var(--bg)); }
+.fa-widget .fa-empty { fill: none; stroke: var(--muted); stroke-width: .9; stroke-dasharray: 3 2; }
+.fa-widget .fa-q { color: var(--fa-q); } .fa-widget .fa-k { color: var(--fa-k); } .fa-widget .fa-v { color: var(--fa-v); } .fa-widget .fa-s { color: var(--fa-s); }
+.fa-widget .fa-cells,.fa-widget .fa-bar { fill: currentColor; }
+.fa-widget .fa-brackets,.fa-widget .fa-arrow { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fa-widget .fa-arrow { color: var(--muted); }
+.fa-widget svg .fa-tile-label { fill: currentColor; font-weight: 650; font-size: 14px; }
+.fa-widget .fa-grid,.fa-widget .fa-rule { stroke: var(--line); stroke-width: 1; fill: none; }
+.fa-widget .fa-grid { stroke-dasharray: 3 3; }
+@media(max-width:600px) {
+  .fa-widget .fa-tools { padding: 10px 13px; }
+  .fa-widget .fa-steps { gap: 8px; }
+  .fa-widget .fa-steps label { gap: 5px; }
+  .fa-widget .fa-tools button { padding-inline: 8px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .fa-widget *, .fa-widget *::before, .fa-widget *::after { transition: none !important; animation: none !important; }
+}

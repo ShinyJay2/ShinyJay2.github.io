@@ -1,0 +1,68 @@
+/* The package and the magnified SM use layout primitives so labels stay full size on narrow screens. */
+.fah.explainer { --fh-die:#345a84; --fh-mem:#327247; --fh-math:#8a532b; --fh-outline:#8492a1; --fh-pcb:#edf3f5; --fh-trace:#cad6db; --fh-wait:#6384a6; --fh-label:#455361; --fh-mono:ui-monospace,SFMono-Regular,Consolas,monospace; }
+html[data-theme=dark] .fah.explainer { --fh-die:#8ab7ea; --fh-mem:#95d6a4; --fh-math:#ffc086; --fh-outline:#566574; --fh-pcb:#171e28; --fh-trace:#2a3644; --fh-wait:#8caac6; --fh-label:#bec8d7; }
+.fah * { box-sizing:border-box; }
+.fah :is(.fah-modes,.fah-playback) { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.fah .fah-modes { margin:16px 0 12px; }
+.fah button { min-height:34px; padding:6px 11px; border:1px solid var(--fh-outline); border-radius:5px; font:500 13px/1.2 var(--ui,system-ui,sans-serif); background:var(--bg); color:var(--text); cursor:pointer; }
+.fah button:disabled { opacity:.45; cursor:default; }
+.fah button:is(:hover,:focus-visible):not(:disabled) { border-color:var(--fh-die); }
+.fah button:focus-visible { outline:2px solid var(--fh-die); outline-offset:2px; }
+.fah button[aria-pressed=true],.fah [data-act=play] { color:var(--fh-die); background:color-mix(in srgb,var(--fh-die) 10%,var(--bg)); border-color:var(--fh-die); font-weight:700; }
+.fah .fah-package { position:relative; border:2px solid var(--fh-outline); border-radius:11px; padding:13px clamp(14px,4%,32px) 21px; color:var(--fh-label); background:radial-gradient(circle,var(--fh-trace) 1px,transparent 1.25px) 0 0/9px 9px,var(--fh-pcb); box-shadow:inset 0 0 0 4px var(--fh-pcb),inset 0 0 0 5px var(--fh-trace); }
+.fah :is(.fah-package-head,.fah-trace-head) { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:2px 12px; }
+.fah .fah-package-head { margin-bottom:10px; font:600 12px/1.4 var(--fh-mono); letter-spacing:.04em; text-transform:uppercase; }
+.fah .fah-package-head span { font-weight:500; }
+.fah .fah-devices { display:grid; align-items:center; grid-template-columns:minmax(0,1.35fr) minmax(65px,.8fr) minmax(0,.9fr); }
+.fah :is(.fah-die,.fah-hbm) { border:2px solid currentColor; border-radius:4px; padding:9px clamp(6px,2%,14px); text-align:center; }
+.fah :is(.fah-die,.fah-hbm,.fah-sram,.fah-cores) > strong { display:block; font-size:15px; line-height:1.3; }
+.fah .fah-die { color:var(--fh-die); background:color-mix(in srgb,var(--fh-die) 11%,var(--bg)); box-shadow:inset 0 0 0 3px var(--bg); }
+.fah .fah-array { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); justify-items:center; gap:4px; margin:7px auto 0; max-width:118px; }
+.fah .fah-array i { display:grid; place-items:center; position:relative; width:100%; max-width:26px; aspect-ratio:1; border:1px solid currentColor; border-radius:2px; background:repeating-linear-gradient(90deg,transparent 0 3px,color-mix(in srgb,var(--fh-die) 22%,transparent) 3px 4px); }
+.fah .fah-array i:first-child { border:2px solid currentColor; box-shadow:0 0 0 2px var(--bg); background:var(--fh-die); color:var(--bg); font:700 11px/1 var(--fh-mono); }
+.fah .fah-hbm { color:var(--fh-mem); background:color-mix(in srgb,var(--fh-mem) 17%,var(--bg)); box-shadow:2px 3px 0 var(--bg),3px 4px 0 var(--fh-mem),4px 6px 0 var(--bg),5px 7px 0 var(--fh-mem); }
+.fah .fah-hbm span,.fah .fah-position { font:600 12px/1.3 var(--fh-mono); }
+.fah .fah-banks { display:grid; grid-template-columns:repeat(5,1fr); gap:3px; height:21px; margin:7px auto 0; max-width:120px; }
+.fah .fah-banks i { border:1px solid currentColor; background:repeating-linear-gradient(0deg,transparent 0 3px,currentColor 3px 4px); opacity:.65; }
+.fah .fah-bridge { min-width:0; display:grid; gap:5px; text-align:center; color:var(--fh-die); font:650 12px/1.2 var(--fh-mono); }
+.fah .fah-bus { position:relative; overflow:hidden; height:16px; border-block:2px solid var(--fh-outline); background:repeating-linear-gradient(0deg,var(--fh-trace) 0 2px,var(--bg) 2px 4px); }
+.fah .fah-bus i { position:absolute; top:2px; bottom:2px; width:8px; background:var(--fh-die); border:1px solid var(--bg); }
+.fah .fah-bus i:nth-child(1) { left:16%; } .fah .fah-bus i:nth-child(2) { left:47%; } .fah .fah-bus i:nth-child(3) { left:78%; }
+.fah[data-playing=true]:not([data-kind=math]) .fah-bus i { left:0; animation:fah-packet 1.4s linear infinite; } .fah[data-playing=true] .fah-bus i:nth-child(2) { animation-delay:-.47s; } .fah[data-playing=true] .fah-bus i:nth-child(3) { animation-delay:-.94s; }
+.fah[data-playing=true][data-kind=read] .fah-bus i { animation-direction:reverse; }
+@keyframes fah-packet { from{left:-9px} to{left:100%} }
+.fah[data-kind=math] .fah-bus i { display:none; } .fah[data-kind=math] .fah-bridge { color:var(--fh-label); }
+.fah .fah-leader { height:14px; margin-left:17%; border-left:2px dashed var(--fh-die); }
+.fah .fah-zoom { padding:10px clamp(10px,2.5%,20px); border:1.5px solid var(--fh-die); border-radius:7px; background:color-mix(in srgb,var(--fh-die) 4%,var(--bg)); }
+.fah .fah-zoom-head { display:flex; align-items:center; gap:7px; color:var(--fh-die); margin-bottom:8px; font-size:13px; }
+.fah .fah-square { width:12px; height:12px; background:var(--fh-die); border:2px solid var(--bg); outline:1px solid var(--fh-die); }
+.fah .fah-inside { display:grid; align-items:stretch; grid-template-columns:1fr 24px 1fr; }
+.fah :is(.fah-sram,.fah-cores) { min-width:0; border:1px solid var(--fh-outline); background:var(--bg); border-radius:4px; padding:8px; }
+.fah .fah-local { align-self:center; text-align:center; color:var(--fh-label); font:18px/1 var(--fh-mono); }
+.fah :is(.fah-sram,.fah-cores) small { display:block; margin:2px 0 6px; font-size:12px; color:var(--fh-label); line-height:1.35; }
+.fah :is(.fah-tiles,.fah-core-grid) { display:flex; gap:3px; }
+.fah .fah-tiles i { width:9px; height:12px; background:color-mix(in srgb,var(--fh-die) 30%,var(--bg)); border:1px solid var(--fh-die); }
+.fah .fah-core-grid i { width:9px; height:9px; border:1px solid var(--fh-outline); }
+.fah[data-kind=math] .fah-core-grid i { background:var(--fh-math); border-color:var(--fh-math); }
+.fah[data-kind=math] .fah-cores { border-color:var(--fh-math); background:color-mix(in srgb,var(--fh-math) 7%,var(--bg)); }
+.fah .fah-set { margin-top:5px; font-size:12px; color:var(--fh-label); }
+.fah .fah-set strong { color:var(--text); }
+.fah .fah-playback { margin:14px 0 9px; }
+.fah .fah-position { margin-left:auto; color:var(--fh-label); white-space:nowrap; }
+.fah .fah-step { display:grid; gap:2px; line-height:1.45; font-size:14px; }
+.fah .fah-step strong { color:var(--text); font-size:16px; }
+.fah .fah-trace { margin:15px 0 7px; padding:10px 0; border-block:1px solid var(--fh-outline); }
+.fah .fah-trace-head strong { font-size:14px; }
+.fah .fah-trace-head span,.fah .fah-note { color:var(--fh-label); font-size:12px; }
+.fah .fah-strip { display:flex; gap:4px; margin:8px 2px 6px; }
+.fah .fah-strip i { flex:1 1 0; height:11px; border-radius:2px; }
+.fah .fah-strip i.fah-current { outline:2px solid var(--text); outline-offset:1px; }
+.fah .fah-key { display:flex; flex-wrap:wrap; gap:2px 13px; color:var(--fh-label); font-size:12px; }
+.fah .fah-key span::before { content:''; display:inline-block; width:10px; height:9px; margin-right:4px; }
+.fah .fah-strip [data-kind=math],.fah .fah-key [data-kind=math]::before { background:var(--fh-math); }
+.fah .fah-strip [data-kind=read],.fah .fah-key [data-kind=read]::before { background:repeating-linear-gradient(125deg,var(--fh-wait) 0 2px,var(--bg) 2px 5px); border:1px solid var(--fh-wait); }
+.fah .fah-strip [data-kind=write],.fah .fah-key [data-kind=write]::before { background:var(--fh-mem); }
+.fah .fah-stat { margin-top:6px; font-size:13px; } .fah .fah-stat b { font-family:var(--fh-mono); }
+.fah .fah-note { line-height:1.45; margin-top:4px; }
+@media(max-width:480px) { .fah .fah-package { padding-inline:12px; } .fah .fah-array { gap:3px; } .fah :is(.fah-die,.fah-hbm,.fah-sram,.fah-cores) > strong { font-size:13px; } .fah .fah-playback { gap:4px; } .fah .fah-playback button { padding-inline:8px; } .fah .fah-inside { grid-template-columns:minmax(0,1.1fr) 20px minmax(0,1fr); } .fah .fah-core-grid { gap:2px; } }
+@media(prefers-reduced-motion:reduce) { .fah .fah-bus i { animation:none!important; } .fah[data-playing=true] .fah-bus i:nth-child(1) {left:16%} .fah[data-playing=true] .fah-bus i:nth-child(2) {left:47%} .fah[data-playing=true] .fah-bus i:nth-child(3) {left:78%} }
