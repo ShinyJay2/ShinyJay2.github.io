@@ -66,58 +66,188 @@ The animation follows the original loop order: **K/V outside, Q inside**. Each v
 
 But softmax needs the whole row's denominator. How can one tile be finished before the next arrives?
 
-## 4. Softmax: two divisions with different jobs
+## 4. Two divisions: make the numbers smaller, then make probabilities
 
-Softmax exponentiates scores, then divides each result by their total:
+Attention mixes values V according to scores computed from Q and K. Softmax turns those scores into probabilities: exponentiate each score, then divide by the sum.
+
+Suppose the scores are \([0,\ln2,\ln4,\ln8]\). Exponentiating gives **weights \([1,2,4,8]\)**. These are not probabilities yet: they add up to 15, not 1.
+
+### Divide by the sum to get probabilities
+
+Dividing each weight by 15 gives:
 
 ```math
-p_j=\frac{e^{s_j}}{\sum_k e^{s_k}}.
+[1/15,\;2/15,\;4/15,\;8/15].
 ```
 
-Choose scores \([0,\ln2,\ln4,\ln8]\), so their exponentials are \([1,2,4,8]\). These are **unnormalized weights**, not probabilities: their sum is 15.
+These add up to 1. A value with twice the weight contributes twice as much to the output.
+
+But an implementation also needs to keep the numbers from getting too large. Exponentials grow quickly enough to overflow. That is the reason for a different division.
+
+### Divide by the largest weight to make the numbers smaller
+
+The largest weight here is 8. Divide every weight by 8:
+
+```math
+[1,2,4,8]\quad\longrightarrow\quad[1/8,2/8,4/8,1].
+```
+
+The largest number is now 1, but the ratio is still **1:2:4:8**. These smaller weights still are not probabilities: their sum is \(15/8=1.875\), not 1.
+
+Now divide by their sum. For the second weight:
+
+```math
+\frac{2/8}{15/8}=\frac{2}{15}.
+```
+
+The 8 cancels. Shrinking all weights by the same factor does not change the final probabilities.
 
 <div class="explainer" data-explainer="fa-normalize" data-mode="0"></div>
 
-Subtracting the maximum score makes the largest exponential 1. Here it divides every weight by 8, preserving their ratio. Their sum becomes 1.875, still not 1. **Only dividing by that sum produces probabilities.**
+**Divide by the largest weight to control the size of the numbers. Divide by the sum of weights to turn them into probabilities.** These are different operations with different jobs.
 
-Thus “divide by 8” rescales; “divide by the total” normalizes. In a real implementation, compute \(e^{s_j-m}\) directly to avoid overflowing before rescaling, rather than first forming huge exponentials.
+### Why the code subtracts a maximum instead
 
-## 5. Why the division can wait
-
-Take weights \([1,3]\) and values \([10,20]\). The ordinary path first makes probabilities \([1/4,3/4]\), then multiplies them by V. But both terms have the same denominator.
-
-<div class="explainer" data-explainer="fa-average"></div>
-
-This is ordinary addition of fractions, not a new softmax identity. Give the numerator and denominator names:
+Computing a huge exponential and only then dividing would be too late to prevent overflow. Instead, subtract the maximum **score** m before exponentiating:
 
 ```math
-w_j=e^{s_j-m},\qquad
-u=\sum_jw_jV_j,\qquad
-\ell=\sum_jw_j,\qquad O=\frac{u}{\ell}.
+e^{s_j-m}=\frac{e^{s_j}}{e^m}.
 ```
 
-The index k in the softmax denominator simply means “sum over all keys.” Every j in the same query row shares that denominator. For vector V, u is a vector too; divide every component by the same scalar \(\ell\).
+Because m is the largest score, \(e^m\) is the largest weight. **Subtracting the maximum score before exponentiating is equivalent to dividing the exponentiated weights by the largest weight.** It just avoids creating the huge numbers in the first place.
 
-**We can accumulate numerator and denominator separately, then divide once.** We do not need to store every completed probability.
+## 5. Make the weighted sum first; divide at the end
 
-## 6. Online softmax: keep the summary, change its scale
+Take weights **[1, 2]** and values **[10, 20]**. Here each V is a single number to keep the example small.
 
-“Online” means processing incoming blocks. Each query row keeps **m**, its largest score so far; **\(\ell\)**, its weight sum; and **u**, its V-weighted sum.
+The usual description first turns the weights into probabilities, then multiplies by V:
 
-When a larger maximum arrives, all old weights need the same rescaling. Apply that multiplier directly to their two totals. No old score needs to be retrieved.
+```math
+O=\frac{1}{3}\times10+\frac{2}{3}\times20.
+```
+
+Both fractions have the same denominator. So multiply and add the numerators first, then divide just once:
+
+```math
+O=\frac{1\times10+2\times20}{1+2}=\frac{50}{3}.
+```
+
+This is ordinary addition of fractions. The denominator stays 3; it does not become 6.
+
+Only two totals are needed:
+
+- **Numerator:** add up weight × V. Here it is 50.
+- **Denominator:** add up the weights. Here it is 3.
+
+As more values arrive, add their contributions to the two totals. Divide only after all values have been processed. **There is no need to finish and store every individual probability.**
+
+The size-control step from Section 4 does not change this. Divide both weights by their maximum, 2, and use [0.5, 1]:
+
+```math
+O=\frac{0.5\times10+1\times20}{0.5+1}
+=\frac{25}{1.5}=\frac{50}{3}.
+```
+
+The numerator and denominator shrink together, so their ratio stays the same.
+
+For the next section, call the numerator **u** and the denominator **ℓ** (lowercase ell). Then the final output is simply **O = u / ℓ**. When V is a vector, u is a vector too; every component is divided by the same scalar ℓ.
+
+## 6. What if the next block contains a larger weight?
+
+Now read the data in two blocks rather than all at once:
+
+- **Block A:** original weights [1, 2], values [10, 20].
+- **Block B:** original weights [4, 8], values [30, 40].
+
+“Original weights” means the exponentials before size control, used here only to explain the arithmetic. The implementation still subtracts the maximum score before exponentiating.
+
+### First, process A using the largest weight seen so far
+
+After reading only A, the largest weight is 2. Divide by 2 to get [0.5, 1]. This is exactly the calculation from Section 5:
+
+```math
+\ell=0.5+1=1.5,\qquad u=0.5\times10+1\times20=25.
+```
+
+Keep the maximum score \(m=\ln2\) and these two totals. The individual scores and weights from A can now be discarded.
+
+### B changes the scale: the largest weight is now 8
+
+B arrives with weights [4, 8]. The new largest weight is 8, so B will be calculated using weights divided by 8.
+
+But A's totals were calculated using weights divided by 2. **Do not add totals calculated on different scales.** First make A's totals look as if its weights had been divided by 8 all along.
+
+A has already been divided by 2. Multiplying by **2/8 = 1/4** finishes the adjustment:
+
+| Block A | Old scale: divide by 2 | New scale: divide by 8 |
+| --- | ---: | ---: |
+| First weight | 0.5 | 0.125 |
+| Second weight | 1 | 0.25 |
+| Denominator ℓ | 1.5 | 0.375 |
+| Numerator u | 25 | 6.25 |
+
+Every row on the right is the corresponding row on the left multiplied by 1/4.
+
+**The kernel does not need to recover the individual old weights. It multiplies the two saved totals by 1/4 directly.** Multiplying every term by the same factor and then adding is equivalent to multiplying the sum by that factor.
+
+This adjustment alone does not change A's weighted average: \(25/1.5=6.25/0.375\). It only changes the scale used to represent it.
+
+### Now add B on the same scale
+
+Divide B's original weights [4, 8] by 8 to get [0.5, 1]. B contributes:
+
+```math
+\text{denominator: }0.5+1=1.5,
+\qquad
+\text{numerator: }0.5\times30+1\times40=55.
+```
+
+Add those contributions to A's adjusted totals:
+
+```math
+\ell=0.375+1.5=1.875,\qquad u=6.25+55=61.25.
+```
+
+All blocks have now been processed. Finally divide:
+
+```math
+O=\frac{61.25}{1.875}=32.6667\ldots
+```
 
 <div class="explainer" data-explainer="fa-online" data-mode="1"></div>
 
-The example uses A's values \([10,20]\) and B's values \([30,40]\). A first gives \(m=\ln2,\ell=1.5,u=25\). B raises the reference to \(\ln8\), so the old totals are multiplied by \(2/8=1/4\). Add B's contribution and the final output is \(61.25/1.875=32.6667\ldots\).
+The animation's first two bars represent A. They shrink together when the maximum changes; only then are B's contributions added. The old bars explain the arithmetic, not an array that the kernel keeps in memory.
 
-**Rescaling preserves A's own weighted average; adding B changes the overall answer.** If the maximum does not increase, the rescaling factor is 1. Applying softmax separately to each tile would be wrong: each tile would assign itself a probability total of one.
-
-<details>
-<summary>The update, in three lines</summary>
+As a check, processing everything at once gives the same answer:
 
 ```math
-m'=\max(m,\max s_{\mathrm{new}}),\qquad \alpha=e^{m-m'}.
+\frac{1\times10+2\times20+4\times30+8\times40}{1+2+4+8}
+=\frac{490}{15}=32.6667\ldots
 ```
+
+### This is what “online” means
+
+“Online” means processing incoming blocks while updating a running summary. It has nothing to do with an internet connection. Each query row remembers just:
+
+1. **m:** the largest score seen so far, which determines the current scale.
+2. **ℓ:** the sum of weights on that scale.
+3. **u:** the sum of weight × V on that scale.
+
+If a new block raises the maximum, shrink the old totals to the new scale before adding the block. If the maximum does not increase, no adjustment is needed. Divide u by ℓ after the last block.
+
+**Do not apply softmax independently to each block and average the results.** That would give every block a probability total of 1 and lose their relative importance. Online softmax maintains one shared scale and one denominator for the entire row.
+
+<details>
+<summary>The same update in symbols</summary>
+
+The new maximum is m′. The scale adjustment is the old largest weight divided by the new largest weight:
+
+```math
+m'=\max(m,\max s_{\mathrm{new}}),\qquad
+\alpha=\frac{e^m}{e^{m'}}=e^{m-m'}.
+```
+
+Adjust the old totals, then add the new block:
 
 ```math
 \ell'=\alpha\ell+\sum_{j\in\mathrm{new}}e^{s_j-m'},
@@ -125,21 +255,62 @@ m'=\max(m,\max s_{\mathrm{new}}),\qquad \alpha=e^{m-m'}.
 u'=\alpha u+\sum_{j\in\mathrm{new}}e^{s_j-m'}V_j.
 ```
 
-Initialize from the first valid block and return \(u/\ell\) after the last. The formulas omit dropout and assume finite valid scores. Masked blocks require appropriate handling. With dropout, the denominator uses undropped weights; numerator contributions use the dropout mask and its scaling. Implementations can maintain an equivalent normalized output accumulator instead of u.
+Initialize from the first valid block and return u/ℓ after the last. These equations omit dropout and assume finite valid scores. Masked blocks require appropriate handling. With dropout, the denominator uses undropped weights; numerator contributions use the dropout mask and its scaling. Implementations can maintain an equivalent normalized output accumulator instead of u.
 
 </details>
 
-## 7. Backward: reconstruct the tile instead of fetching the matrix
+## 7. Need the probabilities again? Recompute just the piece being used
 
-If \(O=0.25V_1+0.75V_2\), an upstream scalar gradient g gives \(dV_1=0.25g\) and \(dV_2=0.75g\). **Backward needs the weights again.**
+So far, the output has been computed without saving every probability. That completes the **forward pass**. Training also needs a **backward pass**, which calculates gradients: how changes in the inputs affect the loss.
 
-A conventional approach saves P. FlashAttention keeps the required inputs, output, and row-normalization statistics, then reconstructs P a tile at a time.
+### Why backward needs the probabilities
+
+Suppose:
+
+```math
+O=0.25V_1+0.75V_2.
+```
+
+Holding the weights fixed, increasing V₁ by 1 increases O by 0.25. Increasing V₂ by 1 increases O by 0.75. Those probabilities tell backward how strongly each V contributes.
+
+If the gradient arriving at O is g, the gradients for these values are \(0.25g\) and \(0.75g\). **Backward needs the mixing weights again.** This is the V-gradient example; the full backward pass also computes Q and K gradients.
+
+A conventional implementation saves the probability matrix P during forward and reads it during backward. For N tokens, P has N × N entries per head and batch element. Saving and reading it moves a lot of data.
+
+### Discarding a probability does not make it impossible to recover
+
+Q and K can produce its score again. The final maximum score m and weight sum ℓ from forward turn that score back into the same probability:
+
+```math
+P_j=\frac{e^{s_j-m}}{\ell}.
+```
+
+Use the numbers from Section 6. The final largest weight was 8, and the final denominator was 1.875. To recover the probability for the item whose original weight was 2:
+
+```math
+P_j=\frac{2/8}{1.875}=\frac{2}{15}.
+```
+
+There is no need to recover the entire matrix. Read the required Q/K blocks, recompute a small score tile, recover its probabilities, use them for gradients, then discard the tile.
+
+**The saved denominator describes the entire query row, not just the current tile.** That is why the recovered probabilities match the original full-row softmax. Normalizing only within the current tile would give different probabilities.
 
 <div class="explainer" data-explainer="fa-recompute"></div>
 
-The saved statistics describe the **entire row**, not just the tile. Original FlashAttention saves m and \(\ell\); an equivalent representation is \(L=m+\log\ell\), giving \(P_j=e^{s_j-L}\).
+The diagram's saved statistic L is just a compact way to encode the same normalization: \(L=m+\log\ell\), so \(P_j=e^{s_j-L}\). Original FlashAttention saves m and ℓ; either representation contains the information needed here. The required inputs and output are also retained for backward.
 
-Q/K blocks are still read and gradients still written. The saving is not zero I/O: it is avoiding the huge saved P matrix. Recomputing can win when the added arithmetic costs less than the memory traffic it replaces. Dropout requires consistently regenerated masks.
+### Why extra calculation can be faster
+
+The choice is not “do the same work” versus “do less work.” It is:
+
+- **Save and read:** move the large probability matrix to memory and back.
+- **Recompute:** do some extra arithmetic to recreate only the small tile currently needed.
+
+On a GPU, moving a large array can cost more time than repeating those calculations. Recomputing wins when that extra arithmetic costs less than the memory traffic it replaces.
+
+Q/K blocks are still read, and gradients are still written. Dropout also requires consistently regenerated masks. The saving is not zero memory traffic: it is avoiding the huge saved P matrix.
+
+**Section 5 keeps totals instead of individual probabilities. Section 6 updates those totals one block at a time. Section 7 recreates discarded probabilities only when backward needs them.** All three serve the same goal: move less intermediate data.
 
 ## 8. More arithmetic, less time
 
