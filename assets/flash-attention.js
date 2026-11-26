@@ -165,7 +165,7 @@ function recompute(el) {
     ['Read a saved probability tile','If forward saved the full N × N probability matrix P, backward can read the needed block of P directly. The highlighted cells are just one block of that stored matrix.'],
     ['Reconstruct the same tile on chip','Read Q/K and saved row statistics; recompute S, then P = exp(S − L). Use the tile and release it. Here L = m + ln ℓ; the original paper saves m and ℓ.']
   ];
-  widget(el,{title:'Where does backward get P?',lead:'Compare two ways to supply one probability tile. Only the data path for P is shown, not every input and output of backward.',choices:options('Backward data path',['Save full P','Recompute P tile']),draw:({mode,w})=>{
+  widget(el,{title:'Standard Attention vs. FlashAttention: Backward',lead:'Compare implementations, not FlashAttention settings. Standard attention reads saved P from HBM; FlashAttention recomputes a P tile on chip. Only the P data path is shown.',choices:options('Backward implementation',['Standard Attention','FlashAttention']),draw:({mode,w})=>{
     const left=7,lw=w*.54, right=w*.67,rw=w-right-7, mid=left+lw/2,hx=right+rw/2,cross=(left+lw+right)/2;
     let body=box(left,12,lw,230)+box(right,12,rw,230,'fa-inset')+txt(left+10,37,'On the SM','fa-heading','start')+txt(right+10,37,'HBM','fa-heading','start');
     if(!mode)body+=tile(hx,116,'Full P','q',{rows:6,cols:6,cell:7,highlight:true})+txt(hx,164,'N × N','fa-number')+arrow(right-3,112,left+lw+3,112)+txt(cross,100,'read','fa-small')+tile(mid,116,'P tile','q',{cell:10,cols:2})+arrow(mid,136,mid,199);
