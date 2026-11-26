@@ -26,12 +26,17 @@ function tile(x,y,label,tone='q',opt={}) {
 const svg = (w,h,body,desc) => `<svg class="fa-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${desc}">${body}</svg>`;
 const steps = `<div class="fa-steps"><button type="button" data-prev aria-label="Previous step">Back</button><label><span data-progress></span><input type="range" min="0" step="1" data-step aria-label="Diagram step"></label><button type="button" data-next aria-label="Next step">Next</button></div>`;
 const options = (name,labels) => `<div class="fa-options" role="group" aria-label="${name}">${labels.map((s,i)=>`<button type="button" data-choice="${i}" aria-pressed="${i===0}">${s}</button>`).join('')}</div>`;
-function widget(el,{title,lead,choices='',step=false,draw}) {
+function widget(el,{title,lead,choices='',step=false,initialMode=0,playback=false,draw}) {
   if(el.dataset.mode!==undefined) choices='';
   el.classList.add('fa-widget');
-  el.innerHTML=`<div class="viz-heading"><h3>${title}</h3></div><p>${lead}</p><div class="fa-tools">${choices}${step?steps:''}</div><div class="fa-scene"></div><div class="viz-result fa-caption" aria-live="polite" aria-atomic="true"></div>`;
+  el.innerHTML=`<div class="viz-heading"><h3>${title}</h3></div><p>${lead}</p><div class="fa-tools">${choices}${step?steps:''}${playback?'<div class="fa-options" role="group" aria-label="Animation playback"><button type="button" data-play aria-pressed="false">Play</button><button type="button" data-restart>Restart</button></div>':''}</div><div class="fa-scene"></div><div class="viz-result fa-caption" aria-live="polite" aria-atomic="true"></div>`;
   const q=s=>el.querySelector(s), scene=q('.fa-scene'), caption=q('.fa-caption');
-  let mode=Number(el.dataset.mode||0),i=0,last,renderWidth;
+  let mode=Number(el.dataset.mode ?? initialMode),i=0,last,renderWidth,timer;
+  function stopPlayback() {
+    if(timer!==undefined) window.clearInterval(timer);
+    timer=undefined;
+    if(playback) { q('[data-play]').textContent='Play'; q('[data-play]').setAttribute('aria-pressed','false'); }
+  }
   function update(action='init') {
     const w = scene.clientWidth < 470 ? 380 : 620;
     if(action==='resize' && w===renderWidth) return;
@@ -42,16 +47,30 @@ function widget(el,{title,lead,choices='',step=false,draw}) {
       range.setAttribute('aria-valuetext',`${i+1} of ${result.count}: ${result.heading}`);
       q('[data-progress]').textContent=`Step ${i+1} of ${result.count}`;
       q('[data-prev]').disabled=i===0; q('[data-next]').disabled=i===result.count-1;
+      if(i===result.count-1) stopPlayback();
     }
     el.querySelectorAll('[data-choice]').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.choice===mode)));
     scene.innerHTML=result.image; caption.innerHTML=`<strong>${result.heading}.</strong> ${result.copy}`;
     last={mode,i};
   }
   function setStep(value) { if(value===i)return; i=value; update('step'); }
-  el.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{if(+b.dataset.choice===mode)return;mode=+b.dataset.choice;i=0;update('mode')}));
+  el.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{if(+b.dataset.choice===mode)return;stopPlayback();mode=+b.dataset.choice;i=0;update('mode')}));
   if(step) {
-    q('[data-prev]').addEventListener('click',()=>setStep(i-1));q('[data-next]').addEventListener('click',()=>setStep(i+1));
-    q('[data-step]').addEventListener('input',e=>setStep(+e.target.value));
+    q('[data-prev]').addEventListener('click',()=>{stopPlayback();setStep(i-1)});q('[data-next]').addEventListener('click',()=>{stopPlayback();setStep(i+1)});
+    q('[data-step]').addEventListener('input',e=>{stopPlayback();setStep(+e.target.value)});
+  }
+  if(playback && step) {
+    q('[data-restart]').addEventListener('click',()=>{stopPlayback();i=0;update('restart')});
+    q('[data-play]').addEventListener('click',()=>{
+      if(timer!==undefined) {stopPlayback();return;}
+      if(i===Number(q('[data-step]').max)) {i=0;update('restart');}
+      q('[data-play]').textContent='Pause';
+      q('[data-play]').setAttribute('aria-pressed','true');
+      timer=window.setInterval(()=>{
+        if(!el.isConnected) {stopPlayback();return;}
+        setStep(i+1);
+      },2600);
+    });
   }
   update(); if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>update('resize')).observe(scene);
 }
@@ -161,24 +180,113 @@ function softmax(el) {
 }
 
 function recompute(el) {
-  const descriptions=[
-    ['Read a saved probability tile','If forward saved the full N × N probability matrix P, backward can read the needed block of P directly. The highlighted cells are just one block of that stored matrix.'],
-    ['Reconstruct the same tile on chip','Read Q/K and saved row statistics; recompute S, then P = exp(S − L). Use the tile and release it. Here L = m + ln ℓ; the original paper saves m and ℓ.']
+  // Compute with exact log values, never the rounded display labels. These
+  // statistics describe ALL four keys, even though this tile has only two.
+  const q=1, keys=[0,Math.log(2)], d=1, m=Math.log(8);
+  const fullWeights=[1,2,4,8], l=fullWeights.reduce((sum,x)=>sum+x/8,0);
+  const scores=keys.map(k=>q*k/Math.sqrt(d));
+  const weights=scores.map(s=>Math.exp(s-m));
+  const p=weights.map(x=>x/l), g=15, contributions=p.map(x=>x*g);
+  const numericP='['+p.map(format).join(', ')+']';
+  const numericGradient='['+contributions.map(format).join(', ')+']';
+  const standard=[
+    ['Read the saved P tile','This standard implementation saved the full N × N P matrix in HBM during forward. Read its first two entries for this example row: 1/15 and 2/15. The full saved matrix stays in HBM.'],
+    ['Use the tile for V gradients','For this one query row, take an illustrative scalar upstream output gradient g = 15. Multiply each probability by 15: the contributions to the first two V gradients are 1 and 2. This is only one part of backward, not the full Q/K/V gradient calculation.'],
+    ['Release only the local tile','The local P tile can now be reused as scratch space. Keep the gradient contributions [1, 2]. The full saved P matrix remains in HBM; releasing a local copy does not remove it.']
   ];
-  widget(el,{title:'Standard Attention vs. FlashAttention: Backward',lead:'Compare implementations, not FlashAttention settings. Standard attention reads saved P from HBM; FlashAttention recomputes a P tile on chip. Only the P data path is shown.',choices:options('Backward implementation',['Standard Attention','FlashAttention']),draw:({mode,w})=>{
-    const left=7,lw=w*.54, right=w*.67,rw=w-right-7, mid=left+lw/2,hx=right+rw/2,cross=(left+lw+right)/2;
-    let body=box(left,12,lw,230)+box(right,12,rw,230,'fa-inset')+txt(left+10,37,'On the SM','fa-heading','start')+txt(right+10,37,'HBM','fa-heading','start');
-    if(!mode)body+=tile(hx,116,'Full P','q',{rows:6,cols:6,cell:7,highlight:true})+txt(hx,164,'N × N','fa-number')+arrow(right-3,112,left+lw+3,112)+txt(cross,100,'read','fa-small')+tile(mid,116,'P tile','q',{cell:10,cols:2})+arrow(mid,136,mid,199);
-    else body+=tile(right+rw*.27,80,'Q','q')+tile(right+rw*.73,80,'K','k')+
-      txt(hx,146,'Row L','fa-heading')+txt(hx,165,'saved','fa-small')+
-      arrow(right-3,76,left+lw+3,76)+txt(cross,64,'read','fa-small')+
-      txt(mid,80,'S tile = QKᵀ/√d','fa-number')+arrow(mid,90,mid,124)+
-      arrow(right-3,144,left+lw+3,144)+txt(cross,132,'read','fa-small')+
-      txt(mid,148,'P tile = exp(S − L)','fa-number')+arrow(mid,158,mid,199);
-    body+=txt(mid,219,'Use P tile for gradients','fa-label');
-    return {image:svg(w,252,body,descriptions[mode][1]),heading:descriptions[mode][0],copy:descriptions[mode][1]};
+  const flash=[
+    ['Load Q/K and the saved row statistics','Load Q = 1 and the first two keys [0, ln 2], with d = 1. Saved m = ln 8 and ℓ = 1.875 summarize the full row, whose original exponential weights were [1, 2, 4, 8]. No full P matrix is saved in HBM.'],
+    ['Recompute two scores','Multiply 1 by each key and divide by √1: the scores are [0, ln 2]. Only these two entries are recomputed. Calculations use exact logarithms; decimal labels marked ≈ are rounded.'],
+    ['Recover two stable weights','Use the saved full-row maximum ln 8, not the maximum of this tile. Exponentiating 0 − ln 8 gives 1/8 = 0.125; exponentiating ln 2 − ln 8 gives 2/8 = 0.25.'],
+    ['Recover the same two probabilities','Divide both weights by the saved FULL-row denominator 1.875, not their tile sum 0.375. This gives [1/15, 2/15], exactly the two entries the standard implementation reads. This partial tile is not expected to sum to 1.'],
+    ['Use the recomputed tile immediately','With the same illustrative scalar upstream output gradient g = 15, the contributions to the first two V gradients are [1, 2]. These are contributions from one query row only; other rows and Q/K gradients are not shown.'],
+    ['Discard P; retain the gradient result','Release the local probability tile after use. Keep its V-gradient contributions [1, 2] for accumulation. No full P matrix was written to or read from HBM; another tile can reuse this scratch space.']
+  ];
+  widget(el,{title:'Standard Attention vs. FlashAttention: Backward',lead:'Compare two implementations, not FlashAttention settings. Step through one row’s first two entries. Decimal labels marked ≈ are rounded; calculations use exact logarithms.',choices:options('Backward implementation',['Standard Attention','FlashAttention']),initialMode:1,step:true,playback:true,draw:({mode,i,w,last})=>{
+    const isFlash=mode===1, frames=isFlash?flash:standard, f=frames[i];
+    const used=i>=(isFlash?4:1), discarded=i===(isFlash?5:2);
+    const cx=w/2, x=10, bw=w-20;
+    const workY=158, workH=264, resultY=458;
+    let body=box(x,10,bw,112,'fa-inset')+
+      txt(x+12,32,isFlash?'HBM: no full P saved':'HBM: full N × N P saved','fa-heading','start');
+    if(isFlash) {
+      body+=txt(cx,55,'Q = 1; K tile = [0, ln 2]; d = 1','fa-number')+
+        txt(cx,77,'Saved m = ln 8 ≈ '+format(m)+'; ℓ = '+format(l),'fa-number')+
+        txt(cx,99,'Full-row weights: [1, 2, 4, 8]','fa-small')+
+        txt(cx,114,'ℓ = 0.125 + 0.25 + 0.5 + 1 = 1.875','fa-small');
+    } else {
+      body+=txt(cx,57,'Example row: [1/15, 2/15, 4/15, 8/15]','fa-number')+
+        txt(cx,81,'Read only the first two entries','fa-label')+
+        txt(cx,104,'Full saved P remains here at every step','fa-small');
+    }
+    body+=arrow(cx,125,cx,workY-5)+txt(cx+12,144,isFlash?'Q/K + row stats':'read P tile','fa-small','start');
+    const flashLines=[
+      ['Q = 1; K = [0, ln 2]', 'ln 2 ≈ '+format(keys[1])+'; d = 1', 'Recover only entries 1 and 2'],
+      ['1 × 0 / √1 = 0', '1 × ln 2 / √1 = ln 2 ≈ '+format(scores[1]), 'Score tile: [0, ln 2]'],
+      ['exp(0 − ln 8) = 1/8 = '+format(weights[0]), 'exp(ln 2 − ln 8) = 2/8 = '+format(weights[1]), 'Stable weights: [0.125, 0.25]'],
+      ['0.125 / 1.875 = 1/15 ≈ '+format(p[0]), '0.25 / 1.875 = 2/15 ≈ '+format(p[1]), 'P tile ≈ '+numericP],
+      ['g = 15 (upstream output gradient)', '15 × (1/15) = 1; 15 × (2/15) = 2', 'V-gradient contributions = '+numericGradient],
+      ['P tile discarded', 'Scratch space is ready for the next tile', 'No full P in HBM']
+    ];
+    const standardLines=[
+      ['Local P tile = [1/15, 2/15]', 'P tile ≈ '+numericP, 'Copied from the saved full P'],
+      ['g = 15 (upstream output gradient)', '15 × (1/15) = 1; 15 × (2/15) = 2', 'V-gradient contributions = '+numericGradient],
+      ['Local P tile released', 'Scratch space is ready for the next tile', 'Full saved P still remains in HBM']
+    ];
+    const labels=isFlash?['Loaded operands','Score tile','Stable-weight tile','Recomputed P tile','Use P for gradients','Local scratch: empty']:['Read P tile','Use P for gradients','Local scratch: empty'];
+    // Keep the backing store and calculation frame still. Only numeric
+    // operands/results travel, so motion explains which data is reused.
+    const animate=last && last.mode===mode && last.i!==i && motion();
+    const row=(isFlash?flashLines:standardLines)[i];
+    const operandY=workY+64, tileY=workY+207;
+    const positions=[cx-83,cx+83];
+    const operandSets=isFlash?[
+      ['Q = 1','K = [0, ln 2]'],
+      ['Q = 1','K = [0, ln 2]'],
+      ['[0, ln 2]','m = ln 8'],
+      ['[0.125, 0.25]','ℓ = 1.875'],
+      ['[1/15, 2/15]','g = 15']
+    ]:[['1/15','2/15'],['[1/15, 2/15]','g = 15']];
+    let working=box(x,workY,bw,workH,discarded?'fa-empty':'fa-active')+
+      txt(x+12,workY+26,'On chip: '+labels[i],'fa-heading','start');
+    if(!discarded) {
+      operandSets[i].forEach((value,j)=>{
+        const ox=positions[j];
+        // Q/K originate in HBM. Later left operands are the previous
+        // local result; the right m/denominator is saved row metadata.
+        const sourceY=isFlash?(i<=1?55:j===1&&i<=3?77:tileY):i===0?57:tileY;
+        working+='<g transform="translate('+ox+' '+operandY+')"><g>'+
+          travel(animate && !(j===1 && used)?[cx,sourceY]:null,[ox,operandY])+
+          box(-77,-18,154,30,'fa-inset')+txt(0,2,value,'fa-number')+'</g></g>'+
+          arrow(ox,operandY+16,ox,workY+94);
+      });
+      working+=txt(cx,workY+120,row[0],'fa-number')+
+        txt(cx,workY+151,row[1],'fa-number')+
+        arrow(cx,workY+162,cx,tileY-22)+box(x+12,tileY-18,bw-24,36,'fa-inset');
+      working+='<g transform="translate('+cx+' '+tileY+')"><g>'+
+        travel(animate?[cx,workY+151]:null,[cx,tileY])+
+        txt(0,4,row[2],'fa-number')+'</g></g>';
+    } else {
+      // The old P tile visibly shrinks and disappears, while the gradient
+      // result below remains. Reduced motion renders only the final state.
+      if(animate) working+='<g transform="translate('+cx+' '+operandY+')"><g opacity="0">'+
+        '<animate attributeName="opacity" from="1" to="0" dur="0.65s" fill="freeze"/>'+
+        '<animateTransform attributeName="transform" type="scale" from="1" to="0.05" dur="0.65s" fill="freeze"/>'+
+        box(-110,-20,220,36,'fa-active')+txt(0,3,'P = [1/15, 2/15]','fa-number')+'</g></g>';
+      working+=txt(cx,workY+120,row[0],'fa-heading')+
+        txt(cx,workY+153,row[1],'fa-small')+txt(cx,workY+190,row[2],'fa-small');
+    }
+    working+=txt(cx,workY+247,'One query row: two of four keys','fa-small');
+    body+=working+arrow(cx,workY+workH+4,cx,resultY-5)+
+      box(x,resultY,bw,78,used?'fa-active':'fa-zone')+
+      txt(cx,resultY+25,used?'Retained V-gradient contributions':'V-gradient contributions pending','fa-heading');
+    body+='<g transform="translate('+cx+' '+(resultY+51)+')"><g>'+
+      travel(animate&&used&&!discarded?[cx,tileY]:null,[cx,resultY+51])+
+      txt(0,0,used?numericGradient+': from this query row only':'Not the full backward calculation','fa-number')+'</g></g>'+
+      txt(cx,559,isFlash?'Recompute → use → discard; never save full P':'Read → use → release local copy; full P stays','fa-small');
+    return {count:frames.length,image:svg(w,574,body,f[0]+'. '+f[1]),heading:f[0],copy:f[1]};
   }});
 }
 
-const mount={'fa-memory':memory,'fa-tiling':tiling,'fa-softmax':softmax,'fa-normalize':softmax,'fa-online':softmax,'fa-recompute':recompute};
+const mount={'fa-memory':memory,'fa-tiling':tiling,'fa-softmax':softmax,'fa-recompute':recompute};
 for(const el of document.querySelectorAll('.explainer[data-explainer^="fa-"]')) mount[el.dataset.explainer]?.(el);
