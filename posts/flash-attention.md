@@ -21,7 +21,7 @@ Start with the paper's measured runtime. Then play the memory-flow animations: *
 <figcaption><strong>Original Figure 1, right panel.</strong> Dao et al., FlashAttention (2022), PDF p. 2. Cropped from the source, not redrawn. The paper reports 7.6× attention speedup here, not 7.6× whole-model training speedup. Stage duration includes computation and memory effects; it is not a direct measurement of idle time. <a href="https://arxiv.org/pdf/2205.14135v2#page=2">Read the original figure and caption.</a></figcaption>
 </figure>
 
-## 1. A large warehouse and a small workbench
+## 1. GPU Memory Hierarchy
 
 **Memory stores numbers. Compute units perform arithmetic.** A large store holds all the materials; a small nearby working area makes repeated use cheaper.
 
@@ -33,7 +33,7 @@ On a CPU, RAM holds working data and a cache keeps nearby copies. On a GPU, HBM 
 
 Capacity is how much fits. Bandwidth is bytes moved per second. A memory-bound stage does little arithmetic for each byte it must move: faster arithmetic cannot remove that transfer cost. The animation illustrates this dependency, not measured GPU utilization or exact timing.
 
-## 2. Where the ordinary implementation spends its trips
+## 2. Standard Attention and Memory Traffic
 
 For one head, the familiar computation is:
 
@@ -47,7 +47,7 @@ S and P are \(N\times N\); O is \(N\times d\). A separated implementation writes
 
 A single FP16 score matrix at \(N=4096\) occupies **32 MiB per head and batch element**. Repeatedly moving that intermediate can cost more than its arithmetic. Modern attention APIs may already select a fused implementation; this diagram compares against the separated baseline.
 
-## 3. Tiling: use the intermediate before it leaves
+## 3. Tiling
 
 Bring in Q/K/V blocks that fit locally. Compute a small score tile, consume it into the output summary, then discard it. Reuse the freed space for the next tile.
 
@@ -66,13 +66,17 @@ The animation follows the original loop order: **K/V outside, Q inside**. Each v
 
 But softmax needs the whole row's denominator. How can one tile be finished before the next arrives?
 
-## 4. Two divisions: make the numbers smaller, then make probabilities
+## 4. Online Softmax
+
+Online softmax processes attention scores one block at a time without storing the full probability matrix. Three ideas make this possible: numerical rescaling, delayed normalization, and incremental accumulation.
+
+### Numerical Stability and Softmax Normalization
 
 Attention mixes values V according to scores computed from Q and K. Softmax turns those scores into probabilities: exponentiate each score, then divide by the sum.
 
 Suppose the scores are \([0,\ln2,\ln4,\ln8]\). Exponentiating gives **weights \([1,2,4,8]\)**. These are not probabilities yet: they add up to 15, not 1.
 
-### Divide by the sum to get probabilities
+#### Sum Normalization
 
 Dividing each weight by 15 gives:
 
@@ -84,7 +88,7 @@ These add up to 1. A value with twice the weight contributes twice as much to th
 
 But an implementation also needs to keep the numbers from getting too large. Exponentials grow quickly enough to overflow. That is the reason for a different division.
 
-### Divide by the largest weight to make the numbers smaller
+#### Maximum-Based Rescaling
 
 The largest weight here is 8. Divide every weight by 8:
 
@@ -106,7 +110,7 @@ The 8 cancels. Shrinking all weights by the same factor does not change the fina
 
 **Divide by the largest weight to control the size of the numbers. Divide by the sum of weights to turn them into probabilities.** These are different operations with different jobs.
 
-### Why the code subtracts a maximum instead
+#### Stable Exponentiation
 
 Computing a huge exponential and only then dividing would be too late to prevent overflow. Instead, subtract the maximum **score** m before exponentiating:
 
@@ -116,7 +120,7 @@ e^{s_j-m}=\frac{e^{s_j}}{e^m}.
 
 Because m is the largest score, \(e^m\) is the largest weight. **Subtracting the maximum score before exponentiating is equivalent to dividing the exponentiated weights by the largest weight.** It just avoids creating the huge numbers in the first place.
 
-## 5. Make the weighted sum first; divide at the end
+### Delayed Normalization of the Weighted Sum
 
 Take weights **[1, 2]** and values **[10, 20]**. Here each V is a single number to keep the example small.
 
@@ -141,7 +145,7 @@ Only two totals are needed:
 
 As more values arrive, add their contributions to the two totals. Divide only after all values have been processed. **There is no need to finish and store every individual probability.**
 
-The size-control step from Section 4 does not change this. Divide both weights by their maximum, 2, and use [0.5, 1]:
+The maximum-based rescaling above does not change this. Divide both weights by their maximum, 2, and use [0.5, 1]:
 
 ```math
 O=\frac{0.5\times10+1\times20}{0.5+1}
@@ -152,7 +156,7 @@ The numerator and denominator shrink together, so their ratio stays the same.
 
 For the next section, call the numerator **u** and the denominator **ℓ** (lowercase ell). Then the final output is simply **O = u / ℓ**. When V is a vector, u is a vector too; every component is divided by the same scalar ℓ.
 
-## 6. What if the next block contains a larger weight?
+### Blockwise Accumulation and Rescaling
 
 Now read the data in two blocks rather than all at once:
 
@@ -161,9 +165,9 @@ Now read the data in two blocks rather than all at once:
 
 “Original weights” means the exponentials before size control, used here only to explain the arithmetic. The implementation still subtracts the maximum score before exponentiating.
 
-### First, process A using the largest weight seen so far
+#### Initial Block
 
-After reading only A, the largest weight is 2. Divide by 2 to get [0.5, 1]. This is exactly the calculation from Section 5:
+After reading only A, the largest weight is 2. Divide by 2 to get [0.5, 1]. This is the weighted-sum calculation above:
 
 ```math
 \ell=0.5+1=1.5,\qquad u=0.5\times10+1\times20=25.
@@ -171,7 +175,7 @@ After reading only A, the largest weight is 2. Divide by 2 to get [0.5, 1]. This
 
 Keep the maximum score \(m=\ln2\) and these two totals. The individual scores and weights from A can now be discarded.
 
-### B changes the scale: the largest weight is now 8
+#### Rescaling the Previous Accumulator
 
 B arrives with weights [4, 8]. The new largest weight is 8, so B will be calculated using weights divided by 8.
 
@@ -192,7 +196,7 @@ Every row on the right is the corresponding row on the left multiplied by 1/4.
 
 This adjustment alone does not change A's weighted average: \(25/1.5=6.25/0.375\). It only changes the scale used to represent it.
 
-### Now add B on the same scale
+#### Accumulating the Next Block
 
 Divide B's original weights [4, 8] by 8 to get [0.5, 1]. B contributes:
 
@@ -225,7 +229,7 @@ As a check, processing everything at once gives the same answer:
 =\frac{490}{15}=32.6667\ldots
 ```
 
-### This is what “online” means
+### Running State and Update Rule
 
 “Online” means processing incoming blocks while updating a running summary. It has nothing to do with an internet connection. Each query row remembers just:
 
@@ -259,11 +263,11 @@ Initialize from the first valid block and return u/ℓ after the last. These equ
 
 </details>
 
-## 7. Need the probabilities again? Recompute just the piece being used
+## 5. Backward Pass
 
 So far, the output has been computed without saving every probability. That completes the **forward pass**. Training also needs a **backward pass**, which calculates gradients: how changes in the inputs affect the loss.
 
-### Why backward needs the probabilities
+### Probability Weights in Gradient Computation
 
 Suppose:
 
@@ -277,7 +281,7 @@ If the gradient arriving at O is g, the gradients for these values are \(0.25g\)
 
 A conventional implementation saves the probability matrix P during forward and reads it during backward. For N tokens, P has N × N entries per head and batch element. Saving and reading it moves a lot of data.
 
-### Discarding a probability does not make it impossible to recover
+### Tilewise Probability Recomputation
 
 Q and K can produce its score again. The final maximum score m and weight sum ℓ from forward turn that score back into the same probability:
 
@@ -285,7 +289,7 @@ Q and K can produce its score again. The final maximum score m and weight sum �
 P_j=\frac{e^{s_j-m}}{\ell}.
 ```
 
-Use the numbers from Section 6. The final largest weight was 8, and the final denominator was 1.875. To recover the probability for the item whose original weight was 2:
+Use the blockwise example from Section 4. The final largest weight was 8, and the final denominator was 1.875. To recover the probability for the item whose original weight was 2:
 
 ```math
 P_j=\frac{2/8}{1.875}=\frac{2}{15}.
@@ -299,7 +303,7 @@ There is no need to recover the entire matrix. Read the required Q/K blocks, rec
 
 The diagram's saved statistic L is just a compact way to encode the same normalization: \(L=m+\log\ell\), so \(P_j=e^{s_j-L}\). Original FlashAttention saves m and ℓ; either representation contains the information needed here. The required inputs and output are also retained for backward.
 
-### Why extra calculation can be faster
+### Computation–Memory Trade-off
 
 The choice is not “do the same work” versus “do less work.” It is:
 
@@ -310,9 +314,9 @@ On a GPU, moving a large array can cost more time than repeating those calculati
 
 Q/K blocks are still read, and gradients are still written. Dropout also requires consistently regenerated masks. The saving is not zero memory traffic: it is avoiding the huge saved P matrix.
 
-**Section 5 keeps totals instead of individual probabilities. Section 6 updates those totals one block at a time. Section 7 recreates discarded probabilities only when backward needs them.** All three serve the same goal: move less intermediate data.
+**Online softmax keeps running totals instead of individual probabilities and updates those totals one block at a time. The backward pass recreates discarded probabilities only when needed.** All three serve the same goal: move less intermediate data.
 
-## 8. More arithmetic, less time
+## 6. Performance Analysis
 
 The paper's A100 experiment increases arithmetic but sharply reduces memory traffic. Switch metrics to see why FLOPs alone tell the wrong story.
 
