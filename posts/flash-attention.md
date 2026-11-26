@@ -220,7 +220,7 @@ O=\frac{61.25}{1.875}=32.6667\ldots
 
 <div class="explainer" data-explainer="fa-online" data-mode="1"></div>
 
-The animation's first two bars represent A. They shrink together when the maximum changes; only then are B's contributions added. The old bars explain the arithmetic, not an array that the kernel keeps in memory.
+The animation keeps the running numerator and denominator visible. Orange terms show the active calculation: first rescale the old totals, then add B's contributions, then write the updated totals. The individual old weights need not be recovered.
 
 As a check, processing everything at once gives the same answer:
 
@@ -304,25 +304,9 @@ FlashAttention does **not save the full P matrix in HBM**. Instead, backward rea
 
 <div class="explainer" data-explainer="fa-recompute"></div>
 
-#### Recovering the Original Probabilities
+The animation follows two entries from the same four-key example used in Section 4. Press **Play** or **Next** to watch the scores become weights, the weights become probabilities, and the probability tile contribute to gradients before being discarded. The scalar Q/K example and incoming gradient are illustrative; decimal labels are rounded.
 
-Why can a probability be recovered without saving it? Q and K reproduce its score. The final maximum score m and weight sum ℓ saved from forward provide the scale and denominator:
-
-```math
-P_j=\frac{e^{s_j-m}}{\ell}.
-```
-
-For example, Section 4 ended with a largest original weight of 8 and a scaled weight sum of 1.875. For the item whose original weight was 2, the scaled weight is 2/8. Its probability is therefore:
-
-```math
-P_j=\frac{2/8}{1.875}=\frac{2}{15}.
-```
-
-**The saved denominator covers the entire query row, not just the tile currently being recomputed.** Applying a separate softmax to each tile would produce the wrong probabilities. The full-row statistics let each small tile recover its part of the original softmax exactly in mathematical terms, subject to floating-point rounding.
-
-The diagram labels the saved normalization statistic L. It packages the same information as \(L=m+\log\ell\), giving \(P_j=e^{s_j-L}\). Original FlashAttention saves m and ℓ; L is an equivalent representation for reconstructing P. The required inputs and output are also retained for backward.
-
-In short: **FlashAttention trades reading a saved, full-size P matrix for recomputing a small P tile at a time.** It is not choosing to cache the full matrix in SRAM.
+**The saved normalization information covers the entire query row, even though only two probabilities are being rebuilt.** It is not a separate softmax over the current tile. That is what preserves the original mixing proportions without saving the full P matrix.
 
 ### Computation–Memory Trade-off
 
