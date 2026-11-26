@@ -283,25 +283,46 @@ A conventional implementation saves the probability matrix P during forward and 
 
 ### Tilewise Probability Recomputation
 
-Q and K can produce its score again. The final maximum score m and weight sum ℓ from forward turn that score back into the same probability:
+**The comparison below is standard attention versus FlashAttention, not two settings within FlashAttention.** Backward needs the same probability weights P in both cases. What changes is where those weights come from.
+
+#### Standard Attention: Read P from HBM
+
+A conventional implementation computes P during forward and **saves the full matrix in HBM**, the GPU's large off-chip memory. During backward, it reads the required piece into on-chip working storage and uses it to compute gradients.
+
+This does not mean keeping the full P matrix cached in SRAM between forward and backward. SRAM is small working storage, not a place to retain this large matrix across the two passes.
+
+#### FlashAttention: Recompute a Small P Tile
+
+FlashAttention does **not save the full P matrix in HBM**. Instead, backward reads the required Q/K blocks and the row-normalization statistics saved during forward. It then:
+
+1. Recomputes the scores for one small tile from Q and K.
+2. Converts those scores into the original probabilities using the saved normalization statistics.
+3. Uses that P tile to compute gradient contributions.
+4. Discards the tile and repeats for the next one.
+
+**A small P tile temporarily exists on chip in both implementations. Standard attention fetches that tile from a saved matrix; FlashAttention creates it again by calculation.** The comparison buttons show these two implementations. They are not a cache-versus-recompute preference inside FlashAttention.
+
+<div class="explainer" data-explainer="fa-recompute"></div>
+
+#### Recovering the Original Probabilities
+
+Why can a probability be recovered without saving it? Q and K reproduce its score. The final maximum score m and weight sum ℓ saved from forward provide the scale and denominator:
 
 ```math
 P_j=\frac{e^{s_j-m}}{\ell}.
 ```
 
-Use the blockwise example from Section 4. The final largest weight was 8, and the final denominator was 1.875. To recover the probability for the item whose original weight was 2:
+For example, Section 4 ended with a largest original weight of 8 and a scaled weight sum of 1.875. For the item whose original weight was 2, the scaled weight is 2/8. Its probability is therefore:
 
 ```math
 P_j=\frac{2/8}{1.875}=\frac{2}{15}.
 ```
 
-There is no need to recover the entire matrix. Read the required Q/K blocks, recompute a small score tile, recover its probabilities, use them for gradients, then discard the tile.
+**The saved denominator covers the entire query row, not just the tile currently being recomputed.** Applying a separate softmax to each tile would produce the wrong probabilities. The full-row statistics let each small tile recover its part of the original softmax exactly in mathematical terms, subject to floating-point rounding.
 
-**The saved denominator describes the entire query row, not just the current tile.** That is why the recovered probabilities match the original full-row softmax. Normalizing only within the current tile would give different probabilities.
+The diagram labels the saved normalization statistic L. It packages the same information as \(L=m+\log\ell\), giving \(P_j=e^{s_j-L}\). Original FlashAttention saves m and ℓ; L is an equivalent representation for reconstructing P. The required inputs and output are also retained for backward.
 
-<div class="explainer" data-explainer="fa-recompute"></div>
-
-The diagram's saved statistic L is just a compact way to encode the same normalization: \(L=m+\log\ell\), so \(P_j=e^{s_j-L}\). Original FlashAttention saves m and ℓ; either representation contains the information needed here. The required inputs and output are also retained for backward.
+In short: **FlashAttention trades reading a saved, full-size P matrix for recomputing a small P tile at a time.** It is not choosing to cache the full matrix in SRAM.
 
 ### Computation–Memory Trade-off
 
